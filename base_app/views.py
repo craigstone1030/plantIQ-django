@@ -41,12 +41,13 @@ def loadRecords(request):
     if request.method == 'GET':
         dsId = request.GET.get("dsId")
         metric = request.GET.get("metric")
+        startAt = request.GET.get("startAt")
+        stopAt = request.GET.get("stopAt")
 
         dataSource = ModelDatasource.objects.get(id=dsId) or None
         if dataSource == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
         
-        ret, result = getRecords(getInfluxHandle(dataSource.url, dataSource.token, dataSource.org), dataSource.bucket, metric)
+        ret, result = getRecords(getInfluxHandle(dataSource.url, dataSource.token, dataSource.org), dataSource.bucket, metric, startAt, stopAt)
 
         return JsonResponse({'status': ret, 'data' : result})
-

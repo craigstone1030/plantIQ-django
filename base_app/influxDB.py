@@ -3,6 +3,7 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from django.conf import settings
 from flightsql import FlightSQLClient
+import datetime
 
 #token = os.environ.get("INFLUXDB_TOKEN")
 
@@ -36,11 +37,19 @@ def getAllMeasurements(influxClient, bucket):
     finally:
         client.close()
 
-def getRecords(influxClient, bucket, measurement):
+def getRecords(influxClient, bucket, measurement, startAt, stopAt):
 
     client = influxClient
     try:
-        query = f'from(bucket: "{bucket}") |> range(start: -1d) |> filter(fn: (r) => r._measurement == "{measurement}")'
+        query = f'from(bucket: "{bucket}") |> range(start: {startAt}, stop:{stopAt}) |> filter(fn: (r) => r._measurement == "{measurement}")'
+        if startAt == None and stopAt == None:
+            query = f'from(bucket: "{bucket}") |> range(start: -365d) |> filter(fn: (r) => r._measurement == "{measurement}")'
+        elif stopAt == None:
+            query = f'from(bucket: "{bucket}") |> range(start: {startAt}) |> filter(fn: (r) => r._measurement == "{measurement}")'
+        elif startAt == None:
+            query = f'from(bucket: "{bucket}") |> range(start: -365d, stop:{stopAt}) |> filter(fn: (r) => r._measurement == "{measurement}")'
+
+        print(query)
 
         query_api = client.query_api()
         result = query_api.query(org=settings.INFLUX_ORG, query=query)
