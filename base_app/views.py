@@ -19,16 +19,14 @@ def createDatasource(request):
     
 @csrf_exempt
 def loadDatasources(request):
-    if request.method == 'POST':
-        connections = ModelDatasource.objects.all()
-        json = django.core.serializers.serialize('json',connections)
-        return JsonResponse({'status': 'success', 'data': json})
+    connections = ModelDatasource.objects.all()
+    json = django.core.serializers.serialize('json',connections)
+    return JsonResponse({'status': 'success', 'data': json})
     
 @csrf_exempt
 def loadMetrics(request):
-    if request.method == 'POST':
-        dsId = request.POST.get("dsId")
-        metricName = request.POST.get("metric")
+    if request.method == 'GET':
+        dsId = request.GET.get("dsId")
 
         dataSource = ModelDatasource.objects.get(id=dsId) or None
         if dataSource == None:
@@ -40,9 +38,9 @@ def loadMetrics(request):
     
 @csrf_exempt
 def loadRecords(request):
-    if request.method == 'POST':
-        dsId = request.POST.get("dsId")
-        metric = request.POST.get("metric")
+    if request.method == 'GET':
+        dsId = request.GET.get("dsId")
+        metric = request.GET.get("metric")
 
         dataSource = ModelDatasource.objects.get(id=dsId) or None
         if dataSource == None:
