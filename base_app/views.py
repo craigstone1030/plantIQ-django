@@ -9,7 +9,7 @@ import django.core.serializers
 @csrf_exempt
 def createDatasource(request):
     if request.method == 'POST':
-        newDS = ModelDatasource( url=request.POST.get('url'), token=request.POST.get('token'), org=request.POST.get('org'), bucket=request.POST.get('bucket'))
+        newDS = ModelDatasource( name=request.POST.get('name'), description=request.POST.get('description'), url=request.POST.get('url'), token=request.POST.get('token'), org=request.POST.get('org'), bucket=request.POST.get('bucket'))
         newDS.save()
 
         json = django.core.serializers.serialize('json',[newDS])
