@@ -15,7 +15,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from base_app.views import createDatasource, loadDatasources, loadMetrics, loadRecords
+from base_app.views import *
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -27,5 +27,9 @@ urlpatterns = [
     # metrics
     path('api/metric/all', loadMetrics), # load all metrics by one datasource
     path('api/metric/load', loadRecords), # load records by one metric 
+
+    # processes
+    path('api/process/create', createProcess), # create process
+    path('api/process/all', loadProcesses), # load all process
 
 ]
