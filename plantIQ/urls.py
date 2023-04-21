@@ -26,10 +26,18 @@ urlpatterns = [
 
     # metrics
     path('api/metric/all', loadMetrics), # load all metrics by one datasource
-    path('api/metric/load', loadRecords), # load records by one metric 
+    path('api/metric/load', loadRecords), # load records by one metric
 
     # processes
     path('api/process/create', createProcess), # create process
     path('api/process/all', loadProcesses), # load all process
+    path('api/process/metrics', loadMetricsByProcess), # load all process
+    path('api/process/detectors', loadDetectorsByProcess), # load all process   
 
+    # detectors
+    path('api/detector/create', createDetector), # create detector
+    path('api/detector/load', loadDetectors), # load all process
+    path('api/detector/process', loadProcessByDetector), # load all process
+    path('api/detector/metrics', loadMetricsByDetector), # load all metrics    
+    path('api/detector/records', loadDetectorRecords), # load all records  
 ]

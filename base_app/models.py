@@ -47,6 +47,9 @@ class ModelDetector(models.Model):
     metricList = models.TextField(default='')
     status = models.BooleanField(default=True)
 
+    def getMetricList(self):
+        return json.loads(self.metricList)
+        
     class Meta:
         db_table = "tbl_detector"
 

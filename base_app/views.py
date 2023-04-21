@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from .models import *
-from .influxDB import getInfluxHandle, getAllMeasurements, getRecords
+from .influxDB import *
 import django.core.serializers
 
 ######### DATSOURCE & METRICS PAGE #########
@@ -10,7 +10,7 @@ import django.core.serializers
 def createDatasource(request):
     if request.method == 'POST':
         userId = request.POST.get('userId')
-        user = ModelUser.objects.get(id=userId) or None
+        user = (ModelUser.objects.filter(id=userId) or [None])[0]
         if user == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid user id - {userId}'})
         
@@ -36,12 +36,12 @@ def loadMetrics(request):
     if request.method == 'GET':
         dsId = request.GET.get("dsId")
 
-        dataSource = ModelDatasource.objects.get(id=dsId) or None
+        dataSource = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
         if dataSource == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
         
         ret, result = getAllMeasurements(getInfluxHandle(dataSource.url, dataSource.token, dataSource.org), dataSource.bucket)
-
+        print(result)
         return JsonResponse({'status': ret, 'data' : result})
     
 @csrf_exempt
@@ -52,7 +52,7 @@ def loadRecords(request):
         startAt = request.GET.get("startAt")
         stopAt = request.GET.get("stopAt")
 
-        dataSource = ModelDatasource.objects.get(id=dsId) or None
+        dataSource = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
         if dataSource == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
         
@@ -63,22 +63,21 @@ def loadRecords(request):
 ######### METRICS PAGE #########
 @csrf_exempt
 def createProcess(request):
-    if request.method == 'POST':
-        dsId = request.POST.get('dsId')
-        datasource = ModelDatasource.objects.get(id=dsId) or None
+    if request.method == 'GET':
+        dsId = request.GET.get('dsId')
+        datasource = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
         if datasource == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
-                        
-        newProcess = ModelProcess( name=request.POST.get('name'), description=request.POST.get('description'),
-                             datasource=datasource, metricList=request.POST.get('metricNames') )
+
+        newProcess = ModelProcess( name=request.GET.get('name'), description=request.GET.get('description'),
+                             datasource=datasource, metricList=request.GET.get('metricNames') )
         newProcess.save()
-
-        print(newProcess.getMetricList())
-
+        
         json = django.core.serializers.serialize('json',[newProcess])
         json = json.strip('[]')
 
         return JsonResponse({'status': 'success', 'data': json} )
+    return JsonResponse({'status': 'error', 'data': ''} )
  
 @csrf_exempt
 def loadProcesses(request):
@@ -91,7 +90,7 @@ def loadMetricsByProcess(request):
     if request.method == 'GET':
         processId = request.GET.get("processId")
 
-        process = ModelProcess.objects.get(id=processId) or None
+        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
         
@@ -101,20 +100,89 @@ def loadMetricsByProcess(request):
 def loadDetectorsByProcess(request):
     if request.method == 'GET':
         processId = request.GET.get("processId")
-        process = ModelProcess.objects.get(id=processId) or None
+        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
         
         detectors = ModelDetector.objects.filter(process=process)
-        return JsonResponse({'status': 'success', 'data' : detectors})
-    
+        json = django.core.serializers.serialize('json',detectors)
+        return JsonResponse({'status': 'success', 'data' : json})
+
+######### DETECTOR PAGE #########
 @csrf_exempt
-def deleteProcess(request):
+def createDetector(request):
     if request.method == 'GET':
-        processId = request.GET.get("processId")
-        process = ModelProcess.objects.get(id=processId) or None
+        processId = request.GET.get('processId')
+        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
-        process.delete()
-        return JsonResponse({'status': 'success', 'data' : ''})
 
+        newDetector = ModelDetector( name=request.GET.get('name'), description=request.GET.get('description'),
+                             process=process, metricList=request.GET.get('metricNames') )
+        newDetector.save()
+        
+        json = django.core.serializers.serialize('json',[newDetector])
+        json = json.strip('[]')
+
+        return JsonResponse({'status': 'success', 'data': json} )
+    return JsonResponse({'status': 'error', 'data': ''} )
+ 
+@csrf_exempt
+def loadDetectors(request):
+    detectors = ModelDetector.objects.all()
+    json = django.core.serializers.serialize('json',detectors)
+    return JsonResponse({'status': 'success', 'data': json})
+
+@csrf_exempt
+def loadProcessByDetector(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get('detectorId')
+        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if detector == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+
+        process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
+        if process == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {process_id.process} at detector id - {detectorId}'})
+        
+        json = django.core.serializers.serialize('json', [process])
+        json = json.strip('[]')
+        return JsonResponse({'status': 'success', 'data': json})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+@csrf_exempt
+def loadMetricsByDetector(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get('detectorId')
+        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if detector == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+
+        process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
+        if process == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {process_id.process} at detector id - {detectorId}'})
+        return JsonResponse({'status': 'success', 'data' : detector.getMetricList()})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+@csrf_exempt
+def loadDetectorRecords(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get("detectorId")
+        startAt = request.GET.get("startAt")
+        stopAt = request.GET.get("stopAt")
+
+        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if detector == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+        
+        process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
+        if process == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {detector.process_id}'})
+
+        datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
+        if datasource == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})             
+        
+        ret, result = getDetectorRecords(getInfluxHandle(datasource.url, datasource.token, datasource.org), datasource.bucket, detector.getMetricList(), startAt, stopAt)
+
+        return JsonResponse({'status': ret, 'data' : result})
