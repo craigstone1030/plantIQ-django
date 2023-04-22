@@ -77,11 +77,9 @@ def getDetectorRecords(influxClient, bucket, measurementList, startAt, stopAt):
     client = influxClient
     query_api = client.query_api()
 
-    data_frames = []
-    query = ''
-    i = 0
+    data = {}; i = 0
     for measurement in measurementList:
-        query += f'table{i} = '
+        query = ''
         if startAt == None and stopAt == None:
             query += f'from(bucket: "{bucket}") |> range(start: -365d)'
         elif stopAt == None:
@@ -92,35 +90,31 @@ def getDetectorRecords(influxClient, bucket, measurementList, startAt, stopAt):
             query += f'from(bucket: "{bucket}") |> range(start: {startAt}, stop:{stopAt})'
 
         query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
-        query += f' |> drop(columns:["_start", "_stop", "_measurement", "_field", "result", "table"]) \n'
-
+        query += f' |> drop(columns:["_start", "_stop", "_measurement", "result", "table"]) '
+        query += f' |> yield(name: "result") \n'
+        data_frame = query_api.query_data_frame(org=settings.INFLUX_ORG, query=query)
+        data["time"] = data_frame['_time']
+        data[f"value{i}"] = data_frame['_value']
         i = i + 1
+
+    detectorFrame = pd.DataFrame(data)
+
+    variable_columns = []; i = 0
+    for metric in measurementList:
+        variable_columns.append(f"value{i}"); i = i + 1
+
+    model=IsolationForest(n_estimators=50, max_samples='auto', contamination=float(0.1),max_features=1.0)        
+    model.fit(detectorFrame[variable_columns])
+
+    detectorFrame['scores']=model.decision_function(detectorFrame[variable_columns])
+    detectorFrame['anomaly']=model.predict(detectorFrame[variable_columns])
+
+    # print( detectorFrame )
+
+    results = []
+    for ind in data_frame.index:
+        results.append( ["value", detectorFrame['time'][ind], detectorFrame['scores'][ind]] )
+
+    print( results )
     
-    query += f'result = join('
-    query += 'tables: {'
-    i = 0
-    for measurement in measurementList:
-        query += f'table{i}:table{i},'
-        i = i + 1
-    if len(measurementList) > 0:
-        query = query[:-1]
-    query += '},'
-    query += 'on: ["_time"]'
-    query += f') |> yield(name:"raw data")'
-
-    print(query)
-
-    data_frame = query_api.query_data_frame(org=settings.INFLUX_ORG, query=query)
-
-    variable_columns = []
-    for measurement in measurementList:
-        variable_columns.append(f'_value_table{i}'); i = i + 1
-    model.fit(data_frame[variable_columns])
-
-    model=IsolationForest(n_estimators=50, max_samples='auto', contamination=float(0.1),max_features=1.0)
-    data_frame['scores']=model.decision_function(data_frame[variable_columns])
-    data_frame['anomaly']=model.predict(data_frame[variable_columns])
-
-    print( data_frame )
-    
-    return 'success', []
+    return 'success', results
