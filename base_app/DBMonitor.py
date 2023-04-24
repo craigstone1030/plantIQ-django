@@ -24,6 +24,7 @@ def update():
 
     global metricList
 
+    # Update datasource
     datasources = ModelDatasource.objects.all()
     for datasource in datasources:
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
@@ -34,10 +35,28 @@ def update():
             if indexOf > 0:
                 lastUpdate = metricList[indexOf]["lastUpdate"]
                 metricList.remove(indexOf)
+            curLastUpdate = isUpdateAvailable(influxHandle, datasource.bucket, metricName, lastUpdate)
+            metricList.append( { "dsId": datasource.pk, "metric": metricName, "lastUpdate": curLastUpdate, "prevLastUpdate": lastUpdate } )
+    
+    # 
+    detectors = ModelDetector.objects.all()
+    for detector in detectors:
+        metrics = detector.getMetricList()
+        startUpdatedAt = None; stopUpdatedAt = None
 
-            lastUpdate = isUpdateAvailable(influxHandle, datasource.bucket, metric, None)
-            metricList.append( { "dsId": datasource.pk, "metric": metric, "lastUpdate": lastUpdate } )
+        for metric in metrics:
+            indexOf = indexOfMetric(metric)
+            if indexOf == -1:
+                continue
+            if startUpdatedAt == None or startUpdatedAt > metricList[indexOf]["prevLastUpdate"]:
+                startUpdatedAt = metricList[indexOf]["prevLastUpdate"]
+            if stopUpdatedAt == None or stopUpdatedAt > metricList[indexOf]["lastUpdate"]:
+                stopUpdatedAt = metricList[indexOf]["lastUpdate"]
+        
+        if startUpdatedAt >= stopUpdatedAt:
+            continue
+        print(f"Update need! {detector.pk}")
 
-    global lastUpdatedAt
-    ret, lastUpdatedAt = isUpdateAvailable(influxHandle, "data1", "SMART_3D_L.GLASS_A_ORI", lastUpdatedAt)
+    # global lastUpdatedAt
+    # ret, lastUpdatedAt = isUpdateAvailable(influxHandle, "data1", "SMART_3D_L.GLASS_A_ORI", lastUpdatedAt)
     # print( ret, lastUpdatedAt )
