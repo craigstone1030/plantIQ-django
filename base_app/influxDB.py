@@ -38,8 +38,6 @@ def getAllMeasurements(influxClient, bucket):
     
     except Exception as e:
         return 'error', e
-    finally:
-        client.close()
 
 def getRecords(influxClient, bucket, measurement, startAt, stopAt):
 
@@ -69,8 +67,6 @@ def getRecords(influxClient, bucket, measurement, startAt, stopAt):
         return 'success', datas
     except Exception as e:
         return 'error', e
-    finally:
-        client.close()
 
 def getDetectorRecords(influxClient, bucket, measurementList, startAt, stopAt):
 
@@ -137,10 +133,10 @@ def isUpdateAvailable(influxClient, bucket, measurement, lastUpdatedAt):
     if len(result) > 0:
         lastUpdatedAt = result[0].records[0]["_time"] + timedelta(seconds=1)
         lastUpdatedAt = lastUpdatedAt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-        print( "New Data", lastUpdatedAt )
+        # print( "New Data", lastUpdatedAt )
         bUpdate = True
     else:
-        print( "No Data", lastUpdatedAt )
+        # print( "No Data", lastUpdatedAt )
         bUpdate = False
 
     return bUpdate, lastUpdatedAt

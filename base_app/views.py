@@ -41,7 +41,7 @@ def loadMetrics(request):
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
         
         influxHandle = getInfluxHandle(dataSource.url, dataSource.token, dataSource.org)
-        ret, result = getAllMeasurements(influxHandle, dataSource.bucket); del influxHandle
+        ret, result = getAllMeasurements(influxHandle, dataSource.bucket); influxHandle.close(); del influxHandle
         return JsonResponse({'status': ret, 'data' : result})
     
 @csrf_exempt
@@ -57,7 +57,7 @@ def loadRecords(request):
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
         
         influxHandle = getInfluxHandle(dataSource.url, dataSource.token, dataSource.org)
-        ret, result = getRecords(influxHandle, dataSource.bucket, metric, startAt, stopAt); del influxHandle
+        ret, result = getRecords(influxHandle, dataSource.bucket, metric, startAt, stopAt); influxHandle.close(); del influxHandle
 
         return JsonResponse({'status': ret, 'data' : result})
     
@@ -185,6 +185,6 @@ def loadDetectorRecords(request):
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})             
         
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
-        ret, result = getDetectorRecords(influxHandle, datasource.bucket, detector.getMetricList(), startAt, stopAt); del influxHandle
+        ret, result = getDetectorRecords(influxHandle, datasource.bucket, detector.getMetricList(), startAt, stopAt); influxHandle.close(); del influxHandle
 
         return JsonResponse({'status': ret, 'data' : result})
