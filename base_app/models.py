@@ -49,7 +49,19 @@ class ModelDetector(models.Model):
 
     def getMetricList(self):
         return json.loads(self.metricList)
-        
+    
+    def getProcess(self):
+        process = (ModelProcess.objects.filter(id=self.process_id) or [None])[0]
+        return process
+    
+    def getDatasource(self):
+        process = self.getProcess()
+        if process == None:
+            return None
+
+        datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
+        return datasource
+    
     class Meta:
         db_table = "tbl_detector"
 

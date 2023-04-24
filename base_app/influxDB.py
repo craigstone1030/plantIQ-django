@@ -2,7 +2,7 @@ import influxdb_client, os, time
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
 from django.conf import settings
-import datetime
+from datetime import datetime, timedelta
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -90,7 +90,7 @@ def getDetectorRecords(influxClient, bucket, measurementList, startAt, stopAt):
             query += f'from(bucket: "{bucket}") |> range(start: {startAt}, stop:{stopAt})'
 
         query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
-        query += f' |> drop(columns:["_start", "_stop", "_measurement", "result", "table"]) '
+        query += f' |> drop(columns:["_start", "_stop", "_measurement", "result", "table"])'
         query += f' |> yield(name: "result") \n'
         data_frame = query_api.query_data_frame(org=settings.INFLUX_ORG, query=query)
         data["time"] = data_frame['_time']
@@ -118,3 +118,29 @@ def getDetectorRecords(influxClient, bucket, measurementList, startAt, stopAt):
     print( results )
     
     return 'success', results
+
+def isUpdateAvailable(influxClient, bucket, measurement, lastUpdatedAt):
+    query_api = influxClient.query_api()
+
+    query = ''
+    if lastUpdatedAt == 'None':
+        query = f'from(bucket: "{bucket}") |> range(start: 0, stop:{datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")})'
+    else:
+        query = f'from(bucket: "{bucket}") |> range(start: {lastUpdatedAt}, stop:{datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")})'
+    query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
+    # query += f' |> keep(columns: ["_time"])'
+    query += f' |> sort(columns: ["_time"], desc: false)'
+    query += f' |> last()'    
+
+    bUpdate = False
+    result = query_api.query(org=settings.INFLUX_ORG, query=query)
+    if len(result) > 0:
+        lastUpdatedAt = result[0].records[0]["_time"] + timedelta(seconds=1)
+        lastUpdatedAt = lastUpdatedAt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        print( "New Data", lastUpdatedAt )
+        bUpdate = True
+    else:
+        print( "No Data", lastUpdatedAt )
+        bUpdate = False
+
+    return bUpdate, lastUpdatedAt
