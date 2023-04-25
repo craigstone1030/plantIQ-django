@@ -1,6 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from .models import *
 from .influxDB import *
+from .EchoServer import *
 
 metricList = []
 
@@ -12,15 +13,18 @@ def indexOfMetric( dsId, metricName ):
         i = i + 1
     return -1
 
-def start():
+def startScheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(update, 'interval', seconds=20)
-    scheduler.start()
+    scheduler.add_job(socket_handler, 'interval', seconds=1)
+    scheduler.start()    
+
+def socket_handler():
+    websocketServer.handle_request()
 
 def update():
 
-    print("==============================")
-
+    # print("==============================")
     global metricList
 
     # Update datasource
@@ -36,7 +40,7 @@ def update():
                 metricList.remove(metricList[indexOf])
             ret, curLastUpdate = isUpdateAvailable(influxHandle, datasource.bucket, metricName, lastUpdate)
             metricList.append( { "dsId": datasource.pk, "metric": metricName, "lastUpdate": curLastUpdate, "prevLastUpdate": lastUpdate } )
-            print( datasource.pk, metricName, lastUpdate, curLastUpdate, len(metricList) )
+            # print( datasource.pk, metricName, lastUpdate, curLastUpdate, len(metricList) )
         influxHandle.close(); del influxHandle
     
     # 
@@ -58,12 +62,10 @@ def update():
             if stopUpdatedAt == None or stopUpdatedAt > metricList[indexOf]["lastUpdate"]:
                 stopUpdatedAt = metricList[indexOf]["lastUpdate"]
         
-        print( startUpdatedAt, stopUpdatedAt )
+        # print( startUpdatedAt, stopUpdatedAt )
         
         if startUpdatedAt >= stopUpdatedAt:
             continue
         print(f"Update need! {detector.pk}")
 
-    # global lastUpdatedAt
-    # ret, lastUpdatedAt = isUpdateAvailable(influxHandle, "data1", "SMART_3D_L.GLASS_A_ORI", lastUpdatedAt)
-    # print( ret, lastUpdatedAt )
+        boradcast(json.dumps({"type": "DETECTOR_UPDATED", "detectorId": detector.pk, "startAt": startUpdatedAt, "stopAt": stopUpdatedAt}))
