@@ -4,6 +4,7 @@ from .influxDB import *
 from .EchoServer import *
 
 metricList = []
+update_callcnt = 0
 
 def indexOfMetric( dsId, metricName ):
     i = 0
@@ -15,16 +16,17 @@ def indexOfMetric( dsId, metricName ):
 
 def startScheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update, 'interval', seconds=20)
+    scheduler.add_job(run, 'interval', seconds=5)
     scheduler.add_job(socket_handler, 'interval', seconds=1)
     scheduler.start()    
 
 def socket_handler():
     websocketServer.handle_request()
 
-def update():
-
-    # print("==============================")
+def run():
+    global update_callcnt
+    update_callcnt = update_callcnt + 1
+    print("==============", update_callcnt, "================")
     global metricList
 
     # Update datasource
@@ -68,4 +70,14 @@ def update():
             continue
         print(f"Update need! {detector.pk}")
 
-        boradcast(json.dumps({"type": "DETECTOR_UPDATED", "detectorId": detector.pk, "startAt": startUpdatedAt, "stopAt": stopUpdatedAt}))
+        # influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
+        # ret, result = getDetectorRecords(influxHandle, datasource.bucket, metrics, startUpdatedAt, stopUpdatedAt)
+        # influxHandle.close(); del influxHandle
+
+        # print(result)
+
+        boradcast(json.dumps({
+            "type": "DETECTOR_UPDATED",
+            "detectorId": detector.pk,
+            "startAt": startUpdatedAt,
+            "stopAt": stopUpdatedAt}))

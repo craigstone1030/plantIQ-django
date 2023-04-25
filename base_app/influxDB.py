@@ -68,6 +68,11 @@ def getRecords(influxClient, bucket, measurement, startAt, stopAt):
     except Exception as e:
         return 'error', e
 
+# nat = np.datetime64('NaT')
+
+# def nat_check(nat):
+#     return nat == np.datetime64('NaT')
+    
 def getDetectorRecords(influxClient, bucket, measurementList, startAt, stopAt):
 
     client = influxClient
@@ -94,10 +99,12 @@ def getDetectorRecords(influxClient, bucket, measurementList, startAt, stopAt):
         i = i + 1
 
     detectorFrame = pd.DataFrame(data)
+    detectorFrame = detectorFrame.loc[pd.isnull(detectorFrame["time"]) == False]
 
     variable_columns = []; i = 0
     for metric in measurementList:
         variable_columns.append(f"value{i}"); i = i + 1
+        
 
     model=IsolationForest(n_estimators=50, max_samples='auto', contamination=float(0.1),max_features=1.0)        
     model.fit(detectorFrame[variable_columns])
