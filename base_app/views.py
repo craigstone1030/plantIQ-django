@@ -185,6 +185,6 @@ def loadDetectorRecords(request):
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})             
         
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
-        ret, result = getDetectorRecords(influxHandle, datasource.bucket, detector.getMetricList(), startAt, stopAt); influxHandle.close(); del influxHandle
+        ret, result = getDetectorRecords(influxHandle, datasource.bucket, detector.name, startAt, stopAt); influxHandle.close(); del influxHandle
 
         return JsonResponse({'status': ret, 'data' : result})

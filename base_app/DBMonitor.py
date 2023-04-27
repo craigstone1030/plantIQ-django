@@ -16,7 +16,7 @@ def indexOfMetric( dsId, metricName ):
 
 def startScheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(run, 'interval', seconds=5)
+    scheduler.add_job(run, 'interval', seconds=20)
     scheduler.add_job(socket_handler, 'interval', seconds=1)
     scheduler.start()    
 
@@ -65,14 +65,17 @@ def run():
                 stopUpdatedAt = metricList[indexOf]["lastUpdate"]
         
         # print( startUpdatedAt, stopUpdatedAt )
-        
+        if pd.isnull(startUpdatedAt) or pd.isnull(stopUpdatedAt):
+            continue
+
         if startUpdatedAt >= stopUpdatedAt:
             continue
-        print(f"Update need! {detector.pk}")
 
-        # influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
-        # ret, result = getDetectorRecords(influxHandle, datasource.bucket, metrics, startUpdatedAt, stopUpdatedAt)
-        # influxHandle.close(); del influxHandle
+        print(f"Update need! {detector.pk} {startUpdatedAt} ~ {stopUpdatedAt}")
+
+        influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
+        updateDetection(influxHandle, datasource.bucket, datasource.org, detector.name, metrics, startUpdatedAt, stopUpdatedAt)
+        influxHandle.close(); del influxHandle
 
         # print(result)
 

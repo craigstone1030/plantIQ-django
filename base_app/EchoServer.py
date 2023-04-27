@@ -25,6 +25,6 @@ def initSocketServer(port):
     # server.serve_forever()
 
 def boradcast(data):
-    print("broadcast:", data)
+    print(len(clients), "broadcast:", data)
     for client in clients:
         client.send_message(data)
