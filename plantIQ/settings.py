@@ -132,4 +132,7 @@ CORS_ALLOW_ALL_ORIGINS = True
 # User Own Config
 INFLUX_API_TOKEN = "Z0l0UrvG0xBdYN-zv4wBH6TCYn_g5nQ6GfoXnF67Av9Aj6YFh1cpo8mDLw2DfGeMsRbxpwhQXgqz_hnjvfhwMg=="
 INFLUX_URL = "https://us-east-1-1.aws.cloud2.influxdata.com"
-INFLUX_ORG = "Vostok Games"
+INFLUX_ORG = "org"
+
+UPDATE_INTERVAL = 20
+WEBSOCKET_PORT = 8089

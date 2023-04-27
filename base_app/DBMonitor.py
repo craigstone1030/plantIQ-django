@@ -2,6 +2,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from .models import *
 from .influxDB import *
 from .EchoServer import *
+from django.conf import settings
 
 metricList = []
 update_callcnt = 0
@@ -16,7 +17,7 @@ def indexOfMetric( dsId, metricName ):
 
 def startScheduler():
     scheduler = BackgroundScheduler()
-    scheduler.add_job(run, 'interval', seconds=20)
+    scheduler.add_job(run, 'interval', seconds=settings.UPDATE_INTERVAL)
     scheduler.add_job(socket_handler, 'interval', seconds=1)
     scheduler.start()    
 

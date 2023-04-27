@@ -1,6 +1,7 @@
 from django.apps import AppConfig
 import json
 import os
+from django.conf import settings
 
 class BaseAppConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
@@ -13,6 +14,6 @@ class BaseAppConfig(AppConfig):
         os.environ['CMDLINERUNNER_RUN_ONCE'] = 'True' 
     
         from .EchoServer import initSocketServer, boradcast
-        initSocketServer( 8089 )
+        initSocketServer( settings.WEBSOCKET_PORT )
         from .DBMonitor import startScheduler
         startScheduler()
