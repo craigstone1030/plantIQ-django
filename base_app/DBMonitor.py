@@ -75,7 +75,7 @@ def run():
         print(f"Update need! {detector.pk} {startUpdatedAt} ~ {stopUpdatedAt}")
 
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
-        updateDetection(influxHandle, datasource.bucket, datasource.org, detector.name, metrics, startUpdatedAt, stopUpdatedAt)
+        updateDetection(influxHandle, datasource.bucket, datasource.org, detector.exportCode, metrics, startUpdatedAt, stopUpdatedAt)
         influxHandle.close(); del influxHandle
 
         # print(result)

@@ -8,15 +8,15 @@ import django.core.serializers
 ######### DATSOURCE & METRICS PAGE #########
 @csrf_exempt
 def createDatasource(request):
-    if request.method == 'POST':
-        userId = request.POST.get('userId')
+    if request.method == 'GET':
+        userId = request.GET.get('userId')
         user = (ModelUser.objects.filter(id=userId) or [None])[0]
         if user == None:
-            return JsonResponse({'status': 'error', 'error': 'Invalid user id - {userId}'})
+            return JsonResponse({'status': 'error', 'error': f'Invalid user id - {userId}'})
         
-        newDS = ModelDatasource( name=request.POST.get('name'), description=request.POST.get('description'),
-                                url=request.POST.get('url'), token=request.POST.get('token'),
-                                org=request.POST.get('org'), bucket=request.POST.get('bucket'),
+        newDS = ModelDatasource( name=request.GET.get('name'), description=request.GET.get('description'),
+                                url=request.GET.get('url'), token=request.GET.get('token'),
+                                org=request.GET.get('org'), bucket=request.GET.get('bucket'),
                                 user=user )
         newDS.save()
 
@@ -25,6 +25,44 @@ def createDatasource(request):
 
         return JsonResponse({'status': 'success', 'data': json} )
     
+@csrf_exempt
+def updateDatasource(request):
+    if request.method == 'GET':
+        dsId = request.GET.get('id')
+        curDS = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
+        if curDS == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid datasource id - {dsId}'})
+        
+        userId = request.GET.get('userId')
+        user = (ModelUser.objects.filter(id=userId) or [None])[0]
+        if user == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid user id - {userId}'})
+        
+        curDS.name = request.GET.get('name')
+        curDS.description = request.GET.get('description')
+        curDS.url = request.GET.get('url')
+        curDS.token = request.GET.get('token')
+        curDS.org = request.GET.get('org')
+        curDS.bucket = request.GET.get('bucket')
+        curDS.save()
+
+        json = django.core.serializers.serialize('json',[curDS])
+        json = json.strip('[]')
+
+        return JsonResponse({'status': 'success', 'data': json} )
+    
+@csrf_exempt
+def deleteDatasource(request):
+    if request.method == 'GET':
+        dsId = request.GET.get('id')
+        curDS = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
+        if curDS == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
+        
+        curDS.delete()
+
+        return JsonResponse({'status': 'success', 'data': ''} )
+
 @csrf_exempt
 def loadDatasources(request):
     connections = ModelDatasource.objects.all()
@@ -79,7 +117,36 @@ def createProcess(request):
 
         return JsonResponse({'status': 'success', 'data': json} )
     return JsonResponse({'status': 'error', 'data': ''} )
- 
+
+@csrf_exempt
+def updateProcess(request):
+    if request.method == 'GET':
+        processId = request.GET.get('id')
+        curProcess = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        if curProcess == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
+                
+        curProcess.name = request.GET.get('name')
+        curProcess.description = request.GET.get('description')
+        curProcess.save()
+
+        json = django.core.serializers.serialize('json',[curProcess])
+        json = json.strip('[]')
+
+        return JsonResponse({'status': 'success', 'data': json} )
+  
+@csrf_exempt
+def deleteProcess(request):
+    if request.method == 'GET':
+        processId = request.GET.get('id')
+        curProcess = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        if curProcess == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
+        
+        curProcess.delete()
+
+        return JsonResponse({'status': 'success', 'data': ''} )
+
 @csrf_exempt
 def loadProcesses(request):
     processes = ModelProcess.objects.all()
@@ -119,7 +186,10 @@ def createDetector(request):
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
 
         newDetector = ModelDetector( name=request.GET.get('name'), description=request.GET.get('description'),
-                             process=process, metricList=request.GET.get('metricNames') )
+                             process=process, metricList=request.GET.get('metricNames'), exportCode=uuid.uuid1() )
+        if newDetector.validateName() == False :
+            return JsonResponse({'status': 'error', 'error': 'Please input another name.'})
+        
         newDetector.save()
         
         json = django.core.serializers.serialize('json',[newDetector])
@@ -128,6 +198,47 @@ def createDetector(request):
         return JsonResponse({'status': 'success', 'data': json} )
     return JsonResponse({'status': 'error', 'data': ''} )
  
+@csrf_exempt
+def updateDetector(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get('id')
+        curDetector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if curDetector == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {variable}'})
+        
+        processId = request.GET.get('processId')
+        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        if process == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
+                
+        curDetector.name = request.GET.get('name')
+        curDetector.description = request.GET.get('description')
+        curDetector.process = process
+        curDetector.metricList = request.GET.get('metricNames')
+
+        if curDetector.validateName() == False :
+            return JsonResponse({'status': 'error', 'error': 'Please input another name.'})
+        
+        curDetector.save()
+
+        json = django.core.serializers.serialize('json',[curDetector])
+        json = json.strip('[]')
+
+        return JsonResponse({'status': 'success', 'data': json} )
+
+@csrf_exempt
+def deleteDetector(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get('id')
+        curDetector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if curDetector == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+        
+        curDetector.delete()
+
+        return JsonResponse({'status': 'success', 'data': ''} )
+
+
 @csrf_exempt
 def loadDetectors(request):
     detectors = ModelDetector.objects.all()
@@ -185,6 +296,6 @@ def loadDetectorRecords(request):
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})             
         
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
-        ret, result = getDetectorRecords(influxHandle, datasource.bucket, detector.name, startAt, stopAt); influxHandle.close(); del influxHandle
+        ret, result = getDetectorRecords(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt); influxHandle.close(); del influxHandle
 
         return JsonResponse({'status': ret, 'data' : result})

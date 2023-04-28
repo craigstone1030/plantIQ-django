@@ -8,7 +8,7 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.ensemble import IsolationForest
-# from robust_random_cut_forest import robust_random_cut_forest
+import uuid
 import rrcf
 
 #token = os.environ.get("INFLUXDB_TOKEN")
@@ -25,6 +25,14 @@ def getInfluxHandle(url, token, org):
     return influxdb_client.InfluxDBClient(url=url, token=token, org=org)
 
 def getAllMeasurements(influxClient, bucket):
+
+    def is_valid_uuid(value):
+        try:
+            uuid.UUID(str(value))
+            return True
+        except ValueError:
+            return False
+        
     client = influxClient
     try:
         query = f"""
@@ -34,7 +42,12 @@ def getAllMeasurements(influxClient, bucket):
 
         query_api = client.query_api()
         result = query_api.query(org=settings.INFLUX_ORG, query=query)
-        measurements = [row.values["_value"] for table in result for row in table]
+
+        measurements = []
+        for table in result :
+            for row in table :
+                if is_valid_uuid(row.values["_value"]) == False:
+                    measurements.append(row.values["_value"])
 
         return 'success', measurements
     
@@ -217,9 +230,9 @@ def isUpdateAvailable(influxClient, bucket, measurement, lastUpdatedAt):
 
     query = ''
     if lastUpdatedAt == 'None':
-        query = f'from(bucket: "{bucket}") |> range(start: 0, stop:{datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")})'
+        query = f'from(bucket: "{bucket}") |> range(start: 0, stop:{datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")})'
     else:
-        query = f'from(bucket: "{bucket}") |> range(start: {lastUpdatedAt}, stop:{datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000Z")})'
+        query = f'from(bucket: "{bucket}") |> range(start: {lastUpdatedAt}, stop:{datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")})'
     query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
     # query += f' |> keep(columns: ["_time"])'
     query += f' |> sort(columns: ["_time"], desc: false)'

@@ -1,5 +1,6 @@
 from django.db import models
 import json
+import uuid
 
 # Create your models here.
 class ModelUser(models.Model):
@@ -46,6 +47,18 @@ class ModelDetector(models.Model):
     process = models.ForeignKey(ModelProcess,default=-1,on_delete=models.CASCADE)
     metricList = models.TextField(default='')
     status = models.BooleanField(default=True)
+    exportCode = models.CharField(default='', max_length=250)
+
+    def is_valid_uuid(self, value):
+        try:
+            uuid.UUID(str(value))
+
+            return True
+        except ValueError:
+            return False
+    
+    def validateName(self):
+        return self.is_valid_uuid(self.name) == False
 
     def getMetricList(self):
         return json.loads(self.metricList)
