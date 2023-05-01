@@ -150,15 +150,20 @@ def detectMetrics(influxClient, bucket, measurementList, startAt, stopAt):
     client = influxClient
     query_api = client.query_api()
 
+    if startAt == None:
+        startAt = '1970-12-31T00:00:00.000Z'
+    if stopAt == None:
+        stopAt = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
     data = {}; i = 0
     for measurement in measurementList:
         query = ''
         if startAt == None and stopAt == None:
-            query += f'from(bucket: "{bucket}") |> range(start: -365d)'
+            query += f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z)'
         elif stopAt == None:
             query += f'from(bucket: "{bucket}") |> range(start: {startAt})'
         elif startAt == None:
-            query += f'from(bucket: "{bucket}") |> range(start: -365d, stop:{stopAt})'
+            query += f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z, stop:{stopAt})'
         else:
             query += f'from(bucket: "{bucket}") |> range(start: {startAt}, stop:{stopAt})'
 
@@ -211,7 +216,7 @@ def detectMetrics(influxClient, bucket, measurementList, startAt, stopAt):
         results.append(["value", datetime.fromtimestamp(dtInd).strftime('%Y-%m-%dT%H:%M:%S.%fZ'), anomaly_results[i]])
         dtInd = dtInd + distance / len(anomaly_results)
 
-    print( results )
+    # print( results )
     
     return 'success', results
 
@@ -251,3 +256,20 @@ def isUpdateAvailable(influxClient, bucket, measurement, lastUpdatedAt):
         bUpdate = False
 
     return bUpdate, lastUpdatedAt
+
+def getInitialAt(influxClient, bucket, measurement):
+    query_api = influxClient.query_api()
+
+    query = f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z, stop:{datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")})'
+    query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
+    # query += f' |> keep(columns: ["_time"])'
+    query += f' |> sort(columns: ["_time"], desc: false)'
+    query += f' |> first()'
+
+    initialAt = None
+    result = query_api.query(org=settings.INFLUX_ORG, query=query)
+    if len(result) > 0:
+        initialAt = result[0].records[0]["_time"]
+        initialAt = initialAt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+    return initialAt

@@ -48,11 +48,11 @@ class ModelDetector(models.Model):
     metricList = models.TextField(default='')
     status = models.BooleanField(default=True)
     exportCode = models.CharField(default='', max_length=250)
+    lastUpdate = models.CharField(default='None', max_length=250)
 
     def is_valid_uuid(self, value):
         try:
             uuid.UUID(str(value))
-
             return True
         except ValueError:
             return False
