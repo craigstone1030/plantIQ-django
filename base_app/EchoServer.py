@@ -21,7 +21,7 @@ class SocketServer(WebSocket):
 
 def initSocketServer(port):
     global websocketServer
-    websocketServer = WebSocketServer('', port, SocketServer)
+    websocketServer = WebSocketServer('0.0.0.0', port, SocketServer)
     # server.serve_forever()
 
 def boradcast(data):

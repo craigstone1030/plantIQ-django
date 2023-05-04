@@ -77,20 +77,21 @@ def run():
     for datasource in datasources:
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
         ret, metrics = getAllMeasurements(influxHandle, datasource.bucket)
-        for metricName in metrics:
-            lastUpdate = 'None'; initialAt = 'None'
-            indexOf = indexOfMetric(datasource.pk, metricName)
-            if indexOf > -1:
-                lastUpdate = metricList[indexOf]["lastUpdate"]
-                metricList.remove(metricList[indexOf])
+        if ret == 'success':
+            for metricName in metrics:
+                lastUpdate = 'None'; initialAt = 'None'
+                indexOf = indexOfMetric(datasource.pk, metricName)
+                if indexOf > -1:
+                    lastUpdate = metricList[indexOf]["lastUpdate"]
+                    metricList.remove(metricList[indexOf])
 
-            initialAt = getInitialAt(influxHandle, datasource.bucket, metricName)
-            ret, curLastUpdate = isUpdateAvailable(influxHandle, datasource.bucket, metricName, lastUpdate)
-            metricList.append( { "dsId": datasource.pk, "metric": metricName, "initialAt": initialAt,"lastUpdate": curLastUpdate, "prevLastUpdate": lastUpdate } )
-            # print( datasource.pk, metricName, lastUpdate, curLastUpdate, len(metricList) )
+                initialAt = getInitialAt(influxHandle, datasource.bucket, metricName)
+                ret, curLastUpdate = isUpdateAvailable(influxHandle, datasource.bucket, metricName, lastUpdate)
+                metricList.append( { "dsId": datasource.pk, "metric": metricName, "initialAt": initialAt,"lastUpdate": curLastUpdate, "prevLastUpdate": lastUpdate } )
+                # print( datasource.pk, metricName, lastUpdate, curLastUpdate, len(metricList) )
         influxHandle.close(); del influxHandle
     
-    # 
+    #  
     detectors = ModelDetector.objects.all()
     for detector in detectors:
         if detector.status == 0: continue
