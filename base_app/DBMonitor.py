@@ -60,7 +60,7 @@ def processDetector():
                 "type": "DETECTOR_UPDATED",
                 "detectorId": detector.pk,
                 "startAt": startUpdatedAt,
-                "stopAt": stopUpdatedAt}))    
+                "stopAt": stopUpdatedAt}))
 
 def socket_handler():
     websocketServer.handle_request()

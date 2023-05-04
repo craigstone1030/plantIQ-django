@@ -52,7 +52,7 @@ def getAllMeasurements(influxClient, bucket):
         return 'success', measurements
     
     except Exception as e:
-        return 'error', e
+        return 'error', f'{e}'
 
 def getRecords(influxClient, bucket, measurement, startAt, stopAt):
 
@@ -81,7 +81,7 @@ def getRecords(influxClient, bucket, measurement, startAt, stopAt):
 
         return 'success', datas
     except Exception as e:
-        return 'error', e
+        return 'error', f'{e}'
 
 def getDetectorRecords(influxClient, bucket, detectorName, startAt, stopAt):
     client = influxClient
@@ -109,7 +109,7 @@ def getDetectorRecords(influxClient, bucket, detectorName, startAt, stopAt):
 
         return 'success', datas
     except Exception as e:
-        return 'error', e
+        return 'error', f'{e}'
     
 
 def rrcf_detect(array, size):
