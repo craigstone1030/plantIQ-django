@@ -24,6 +24,7 @@ def createDatasource(request):
         json = json.strip('[]')
 
         return JsonResponse({'status': 'success', 'data': json} )
+    return JsonResponse({'status': 'error', 'data': ''} )
     
 @csrf_exempt
 def updateDatasource(request):
@@ -50,6 +51,7 @@ def updateDatasource(request):
         json = json.strip('[]')
 
         return JsonResponse({'status': 'success', 'data': json} )
+    return JsonResponse({'status': 'error', 'data': ''} )
     
 @csrf_exempt
 def deleteDatasource(request):
@@ -62,6 +64,7 @@ def deleteDatasource(request):
         curDS.delete()
 
         return JsonResponse({'status': 'success', 'data': ''} )
+    return JsonResponse({'status': 'error', 'data': ''} )
 
 @csrf_exempt
 def loadDatasources(request):
@@ -81,6 +84,7 @@ def loadMetrics(request):
         influxHandle = getInfluxHandle(dataSource.url, dataSource.token, dataSource.org)
         ret, result = getAllMeasurements(influxHandle, dataSource.bucket); influxHandle.close(); del influxHandle
         return JsonResponse({'status': ret, 'data' : result})
+    return JsonResponse({'status': 'error', 'data': ''} )
     
 @csrf_exempt
 def loadRecords(request):
@@ -98,6 +102,7 @@ def loadRecords(request):
         ret, result = getRecords(influxHandle, dataSource.bucket, metric, startAt, stopAt); influxHandle.close(); del influxHandle
 
         return JsonResponse({'status': ret, 'data' : result})
+    return JsonResponse({'status': 'error', 'data': ''} )
     
 ######### METRICS PAGE #########
 @csrf_exempt
@@ -134,6 +139,7 @@ def updateProcess(request):
         json = json.strip('[]')
 
         return JsonResponse({'status': 'success', 'data': json} )
+    return JsonResponse({'status': 'error', 'data': ''} )
   
 @csrf_exempt
 def deleteProcess(request):
@@ -146,6 +152,7 @@ def deleteProcess(request):
         curProcess.delete()
 
         return JsonResponse({'status': 'success', 'data': ''} )
+    return JsonResponse({'status': 'error', 'data': ''} )
 
 @csrf_exempt
 def loadProcesses(request):
@@ -163,6 +170,7 @@ def loadMetricsByProcess(request):
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
         
         return JsonResponse({'status': 'success', 'data' : process.getMetricList()})
+    return JsonResponse({'status': 'error', 'data': ''} )
     
 @csrf_exempt
 def loadDetectorsByProcess(request):
@@ -175,6 +183,34 @@ def loadDetectorsByProcess(request):
         detectors = ModelDetector.objects.filter(process=process)
         json = django.core.serializers.serialize('json',detectors)
         return JsonResponse({'status': 'success', 'data' : json})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+@csrf_exempt
+def setProcessStatus(request):
+    if request.method == 'GET':
+        processId = request.GET.get("processId")
+        status = request.GET.get("status")
+        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        if process == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid process id - {processId}'})
+        
+        process.status = status
+        detectors = ModelDetector.objects.filter(process=process)
+        for detector in detectors:
+            detector.status = status
+            detector.save()
+
+            alerts = ModelAlert.objects.filter(detector=detector)
+            for alert in alerts:
+                alert.status = status
+                alert.save()
+
+        process.save()
+        
+        json = django.core.serializers.serialize('json',[process])
+        json = json.strip('[]')
+        return JsonResponse({'status': 'success', 'data' : json})
+    return JsonResponse({'status': 'error', 'data': ''} )
 
 ######### DETECTOR PAGE #########
 @csrf_exempt
@@ -225,6 +261,7 @@ def updateDetector(request):
         json = json.strip('[]')
 
         return JsonResponse({'status': 'success', 'data': json} )
+    return JsonResponse({'status': 'error', 'data': ''} )
 
 @csrf_exempt
 def deleteDetector(request):
@@ -237,6 +274,7 @@ def deleteDetector(request):
         curDetector.delete()
 
         return JsonResponse({'status': 'success', 'data': ''} )
+    return JsonResponse({'status': 'error', 'data': ''} )
 
 
 @csrf_exempt
@@ -293,9 +331,116 @@ def loadDetectorRecords(request):
 
         datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
         if datasource == None:
-            return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})             
+            return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})
         
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
         ret, result = getDetectorRecords(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt); influxHandle.close(); del influxHandle
 
         return JsonResponse({'status': ret, 'data' : result})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+@csrf_exempt
+def setDetectorStatus(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get("id")
+        status = request.GET.get("status")
+        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if detector == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid detector id - {detectorId}'})
+        
+        detector.status = status
+        detector.save()
+
+        alerts = ModelAlert.objects.filter(detector=detector)
+        for alert in alerts:
+            alert.status = status
+            alert.save()
+
+        json = django.core.serializers.serialize('json',[detector])
+        json = json.strip('[]')
+
+        return JsonResponse({'status': 'success', 'data' : json})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+
+######### ALERT PAGE #########
+
+@csrf_exempt
+def createAlert(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get("detectorId")
+        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if detector == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid detector id - {detectorId}'})
+        
+        alert = ModelAlert(name=request.GET.get('name'), description=request.GET.get('description'),
+                           nearCriticalTreshold=request.GET.get('treshold1'), detector=detector,
+                        criticalTreshold=request.GET.get('treshold2'), duration=request.GET.get('duration'))
+        alert.save()
+
+        json = django.core.serializers.serialize('json',[alert])
+        json = json.strip('[]')
+        return JsonResponse({'status': 'success', 'data' : json})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+@csrf_exempt
+def updateAlert(request):
+    if request.method == 'GET':
+        alertId = request.GET.get("id")
+        curAlert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
+        if curAlert == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid alert id - {alertId}'})
+        
+        curAlert.name = request.GET.get('name')
+        curAlert.description = request.GET.get('description')
+        curAlert.nearCriticalTreshold = request.GET.get('treshold1')
+        curAlert.criticalTreshold = request.GET.get('treshold2')
+        curAlert.duration = request.GET.get('duration')
+        curAlert.save()
+
+        json = django.core.serializers.serialize('json',[curAlert])
+        json = json.strip('[]')
+        return JsonResponse({'status': 'success', 'data' : json})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+@csrf_exempt
+def deleteAlert(request):
+    if request.method == 'GET':
+        alertId = request.GET.get('id')
+        curAlert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
+        if curAlert == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid alert id - {alertId}'})
+
+        curAlert.delete()
+
+        return JsonResponse({'status': 'success', 'data': ''} )
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+
+@csrf_exempt
+def setAlertStatus(request):
+    if request.method == 'GET':
+        alertId = request.GET.get("id")
+        status = request.GET.get("status")
+        curAlert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
+        if curAlert == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid alert id - {alertId}'})
+        
+        curAlert.status = status
+        curAlert.save()
+        
+        json = django.core.serializers.serialize('json',[curAlert])
+        json = json.strip('[]')
+        return JsonResponse({'status': 'success', 'data' : json})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
+@csrf_exempt
+def loadAlertHistory(request):
+    if request.method == 'GET':
+        
+        history = ModelAlertHistory.objects.all()
+        json = django.core.serializers.serialize('json', history)
+        
+        return JsonResponse({'status': 'success', 'data' : json})
+        
+    return JsonResponse({'status': 'error', 'data': ''} )

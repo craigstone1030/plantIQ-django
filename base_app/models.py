@@ -1,6 +1,7 @@
 from django.db import models
 import json
 import uuid
+from datetime import datetime, timedelta
 
 # Create your models here.
 class ModelUser(models.Model):
@@ -30,7 +31,7 @@ class ModelProcess(models.Model):
     description = models.CharField(max_length=250)
     datasource = models.ForeignKey(ModelDatasource, default=-1, on_delete=models.CASCADE)
     metricList = models.TextField(default='') # must string array, then each items are holded by " not '
-    status = models.BooleanField(default=True)
+    status = models.IntegerField(default=1)
 # 
     def setMetricNames(self, jsonMetricNames):
         self.metricList = jsonMetricNames
@@ -46,9 +47,9 @@ class ModelDetector(models.Model):
     description = models.CharField(max_length=250)
     process = models.ForeignKey(ModelProcess,default=-1,on_delete=models.CASCADE)
     metricList = models.TextField(default='')
-    status = models.BooleanField(default=True)
     exportCode = models.CharField(default='', max_length=250)
     lastUpdate = models.CharField(default='None', max_length=250)
+    status = models.IntegerField(default=1)
 
     def is_valid_uuid(self, value):
         try:
@@ -77,6 +78,38 @@ class ModelDetector(models.Model):
     
     class Meta:
         db_table = "tbl_detector"
+
+class ModelAlert(models.Model):
+    name = models.CharField(max_length=250)
+    description = models.CharField(max_length=250)
+    detector = models.ForeignKey(ModelDetector,default=-1,on_delete=models.CASCADE)
+    nearCriticalTreshold = models.FloatField(default=None)
+    criticalTreshold = models.FloatField(default=None)
+    duration = models.IntegerField(default=0) # seconds
+    status = models.IntegerField(default=1)
+
+    def getDetector(self):
+        detector = (ModelDetector.objects.filter(id=self.detector_id) or [None])[0]
+        return detector
+    
+    class Meta:
+        db_table = "tbl_alert"
+
+
+class ModelAlertHistory(models.Model):
+    name = models.CharField(max_length=250)
+    description = models.CharField(max_length=250)
+    processName = models.CharField(max_length=250)
+    detectorName = models.CharField(max_length=250)
+    anomalyValue = models.FloatField(default=None)
+    alertType = models.IntegerField(default=None) # 1: near-critical 2: critical 3: to be normal
+    alertAt = models.DateTimeField(default=datetime.utcnow())
+
+    class Meta:
+        db_table = "tbl_alerthistory"
+    
+
+
 
 # python manage.py makemigrations
 # python manage.py migrate --fake base_app zero

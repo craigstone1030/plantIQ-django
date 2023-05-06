@@ -22,9 +22,9 @@ urlpatterns = [
 
     # datasource
     path('api/datasource/create', createDatasource), # create new datasource
-    path('api/datasource/all', loadDatasources), # load all datasource
     path('api/datasource/update', updateDatasource), # update datasource
-    path('api/datasource/delete', deleteDatasource), # delete datasource
+    path('api/datasource/delete', deleteDatasource), # delete datasource    
+    path('api/datasource/all', loadDatasources), # load all datasource
 
     # metrics
     path('api/metric/all', loadMetrics), # load all metrics by one datasource
@@ -37,13 +37,22 @@ urlpatterns = [
     path('api/process/all', loadProcesses), # load all process
     path('api/process/metrics', loadMetricsByProcess), # load all process
     path('api/process/detectors', loadDetectorsByProcess), # load all process
+    path('api/process/setstatus', setProcessStatus), # set process's status
 
     # detectors
     path('api/detector/create', createDetector), # create detector
-    path('api/detector/update', updateDetector), # update process
-    path('api/detector/delete', deleteDetector), # delete process
-    path('api/detector/load', loadDetectors), # load all process
-    path('api/detector/process', loadProcessByDetector), # load all process
+    path('api/detector/update', updateDetector), # update detector
+    path('api/detector/delete', deleteDetector), # delete detector
+    path('api/detector/load', loadDetectors), # load all detector
+    path('api/detector/process', loadProcessByDetector), # load all detector
     path('api/detector/metrics', loadMetricsByDetector), # load all metrics    
-    path('api/detector/records', loadDetectorRecords), # load all records  
+    path('api/detector/records', loadDetectorRecords), # load all records 
+    path('api/detector/setstatus', setDetectorStatus), # set detector's status
+
+    # alerts
+    path('api/alert/create', createAlert), # create alert
+    path('api/alert/update', updateAlert), # update alert
+    path('api/alert/delete', deleteAlert), # delete alert
+    path('api/alert/setstatus', setAlertStatus), #  alert
+    path('api/alert/history', loadAlertHistory), # delete alert
 ]
