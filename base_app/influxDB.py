@@ -230,6 +230,8 @@ def updateDetection(influxClient, bucket, org, detectorName, measurementList, st
     write_api = influxClient.write_api(write_options=SYNCHRONOUS)
     write_api.write(bucket, org, records )
 
+    return result
+
 def isUpdateAvailable(influxClient, bucket, measurement, lastUpdatedAt):
     query_api = influxClient.query_api()
 

@@ -3,6 +3,7 @@ from .models import *
 from .influxDB import *
 from .EchoServer import *
 from django.conf import settings
+import django.core.serializers
 
 metricList = []
 update_callcnt = 0
@@ -129,14 +130,95 @@ def run():
         print(f"Update need! {detector.pk} {startUpdatedAt} ~ {stopUpdatedAt}")
 
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
-        updateDetection(influxHandle, datasource.bucket, datasource.org, detector.exportCode, metrics, startUpdatedAt, stopUpdatedAt)
+        detectResult = updateDetection(influxHandle, datasource.bucket, datasource.org, detector.exportCode, metrics, startUpdatedAt, stopUpdatedAt)
         influxHandle.close(); del influxHandle
+
+        print(f"Detecting anomaly {detector.pk}")
+        
+        detectAnomaly( detector, detectResult )
 
         detector.lastUpdate = stopUpdatedAt
         detector.save()
 
         boradcast(json.dumps({
-            "type": "DETECTOR_UPDATED",
+            "type": SC_DETECTOR_UPDATED,
             "detectorId": detector.pk,
             "startAt": startUpdatedAt,
             "stopAt": stopUpdatedAt}))
+        
+# detectResult: should be sorted by datetime
+def detectAnomaly(detector, detectResult): 
+
+    alertHistorys = []
+
+    alerts = ModelAlert.objects.filter(detector=detector)
+    
+    for alert in alerts:
+        # Immedietly Detection
+        if alert.duration == 0:
+            pLevel = 0; cLevel = 0
+            for detectItem in detectResult:
+                at = detectItem[1]; value = detectItem[2]
+
+                if value < alert.nearCriticalTreshold:
+                    cLevel = 0
+                if value >= alert.nearCriticalTreshold and value < alert.criticalTreshold:
+                    cLevel = 1                    
+                if value >= alert.criticalTreshold:
+                    cLevel = 2
+                
+                newAlertType = -1
+                if cLevel == 2 and pLevel != cLevel:
+                    newAlertType = ALERT_TYPE_CRITIAL
+                if cLevel == 1 and pLevel == 0:
+                    newAlertType = ALERT_TYPE_NEAR_CRITIAL
+                if cLevel == 0 and pLevel != cLevel:
+                    newAlertType = ALERT_TYPE_NORMAL
+                
+                if newAlertType != -1:
+                    newAlert = ModelAlertHistory(name=alert.name, description=alert.description,
+                                processName=alert.getDetector().getProcess().name, detectorName=alert.getDetector().name,
+                                anomalyValue=value, alertType=newAlertType, alertAt=at )
+                    newAlert.save()
+                    alertHistorys.append(newAlert)
+
+                pLevel = cLevel
+        # Duration Detection
+        if alert.duration > 0:
+            pLevel = 0; cLevel = 0; pDuration = 0; pDetectItem = None
+            for detectItem in detectResult:
+                at = detectItem[1]; value = detectItem[2]
+
+                if value < alert.nearCriticalTreshold:
+                    cLevel = 0
+                if value >= alert.nearCriticalTreshold and value < alert.criticalTreshold:
+                    cLevel = 1
+                if value >= alert.criticalTreshold:
+                    cLevel = 2
+                
+                newAlertType = -1
+                if cLevel == 2 and pLevel != cLevel and pDuration >= alert.duration:
+                    newAlertType = ALERT_TYPE_CRITIAL
+                if cLevel == 1 and pLevel == 0 and pDuration >= alert.duration:
+                    newAlertType = ALERT_TYPE_NEAR_CRITIAL
+                if cLevel == 0 and pLevel != cLevel and pDuration >= alert.duration:
+                    newAlertType = ALERT_TYPE_NORMAL
+                
+                if newAlertType != -1:
+                    newAlert = ModelAlertHistory(name=alert.name, description=alert.description,
+                                processName=alert.getDetector().getProcess().name, detectorName=alert.getDetector().name,
+                                anomalyValue=value, alertType=newAlertType, alertAt=at )
+                    newAlert.save()
+                    alertHistorys.append(newAlert)
+
+                if pLevel == cLevel and pDetectItem != None:
+                    pDuration = pDuration + datetime.strptime(pDetectItem[2], '%Y-%m-%dT%H:%M:%S.%fZ').timestamp() - datetime.strptime(at, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
+                else:
+                    pDuration = 0
+                pLevel = cLevel; pDetectItem = detectItem
+    
+        if len(alertHistorys) > 0:
+            boradcast(json.dumps({
+            "type": SC_NEW_ALERT,
+            "detector": django.core.serializers.serialize('json',[detector]).strip('[]'), 
+            "alerts": django.core.serializers.serialize('json',alertHistorys)}))

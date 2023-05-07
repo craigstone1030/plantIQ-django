@@ -3,6 +3,15 @@ import json
 import uuid
 from datetime import datetime, timedelta
 
+# ALERT TYPE
+ALERT_TYPE_NEAR_CRITIAL = 1
+ALERT_TYPE_CRITIAL = 2
+ALERT_TYPE_NORMAL = 3
+
+# PACKET TYPE
+SC_DETECTOR_UPDATED = "DETECTOR_UPDATED"
+SC_NEW_ALERT = "NEW_ALERTS"
+
 # Create your models here.
 class ModelUser(models.Model):
     firName = models.CharField(max_length=250)
@@ -10,9 +19,13 @@ class ModelUser(models.Model):
     email = models.CharField(max_length=250)
     mobileNumber = models.CharField(max_length=250)
     company = models.CharField(max_length=250)
+    password = models.CharField(max_length=250)
 
     class Meta:
         db_table = "tbl_user"   
+
+    def check_password(self, password):
+        return self.password == password
 
 class ModelDatasource(models.Model):
     name = models.CharField(max_length=250)
@@ -85,7 +98,7 @@ class ModelAlert(models.Model):
     detector = models.ForeignKey(ModelDetector,default=-1,on_delete=models.CASCADE)
     nearCriticalTreshold = models.FloatField(default=None)
     criticalTreshold = models.FloatField(default=None)
-    duration = models.IntegerField(default=0) # seconds
+    duration = models.IntegerField(default=0) # mseconds
     status = models.IntegerField(default=1)
 
     def getDetector(self):
@@ -107,7 +120,7 @@ class ModelAlertHistory(models.Model):
 
     class Meta:
         db_table = "tbl_alerthistory"
-    
+
 
 
 

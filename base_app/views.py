@@ -5,6 +5,49 @@ from .models import *
 from .influxDB import *
 import django.core.serializers
 
+######### LOGIN PAGE #########
+@csrf_exempt
+def login(request) :
+    email = request.GET.get('email')
+    password = request.GET.get('password')
+
+    #   if the user enters an email address then we retrieve the username of the user
+    try : 
+        email = ModelUser.objects.get(email=email).username
+    except : 
+        return JsonResponse({'status': 'error', 'data': 'Does not exist!'})
+
+    user = authenticate(request, email=email, password = password)
+
+    if user is None : 
+        JsonResponse({'status': 'error', 'data': 'Not authorized!'})
+    else :
+        request.session['user_id'] = user.pk
+        JsonResponse({'status': 'success', 'data': 'authenticated successfully'})
+
+@csrf_exempt
+def logout(request):
+    try:
+        del request.session['user_id']
+        request.session.flush()
+    except KeyError:
+        pass
+    
+def authenticate(request, email = None, password = None) : 
+    try : 
+        #   if the user exists
+        user = ModelUser.objects.get(email = email)
+
+        #   authenticating using password
+        if user.check_password(password) : 
+            return user
+
+        #   if the password is invalid
+        return None
+
+    except: 
+        return None
+    
 ######### DATSOURCE & METRICS PAGE #########
 @csrf_exempt
 def createDatasource(request):
@@ -440,7 +483,7 @@ def loadAlertHistory(request):
         
         history = ModelAlertHistory.objects.all()
         json = django.core.serializers.serialize('json', history)
-        
+
         return JsonResponse({'status': 'success', 'data' : json})
         
     return JsonResponse({'status': 'error', 'data': ''} )
