@@ -48,6 +48,7 @@ urlpatterns = [
     path('api/detector/metrics', loadMetricsByDetector), # load all metrics    
     path('api/detector/records', loadDetectorRecords), # load all records 
     path('api/detector/setstatus', setDetectorStatus), # set detector's status
+    path('api/detector/alerts', loadAlertsByDetector), # delete alert
 
     # alerts
     path('api/alert/create', createAlert), # create alert

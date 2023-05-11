@@ -19,7 +19,7 @@ class ModelUser(models.Model):
     email = models.CharField(max_length=250)
     mobileNumber = models.CharField(max_length=250)
     company = models.CharField(max_length=250)
-    password = models.CharField(max_length=250)
+    password = models.CharField(default='', max_length=250)
 
     class Meta:
         db_table = "tbl_user"   

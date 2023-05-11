@@ -459,6 +459,18 @@ def deleteAlert(request):
         return JsonResponse({'status': 'success', 'data': ''} )
     return JsonResponse({'status': 'error', 'data': ''} )
 
+@csrf_exempt
+def loadAlertsByDetector(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get('detectorId')
+        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if detector == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+
+        alerts = ModelAlert.objects.filter(detector=detector)
+        json = django.core.serializers.serialize('json', alerts)
+        return JsonResponse({'status': 'success', 'data' : json})
+    return JsonResponse({'status': 'error', 'data': ''} )
 
 @csrf_exempt
 def setAlertStatus(request):
