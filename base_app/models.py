@@ -112,6 +112,9 @@ class ModelAlert(models.Model):
 class ModelAlertHistory(models.Model):
     name = models.CharField(max_length=250)
     description = models.CharField(max_length=250)
+    alert = models.ForeignKey(ModelAlert,default=-1)
+    detector = models.ForeignKey(ModelDetector,default=-1)
+
     processName = models.CharField(max_length=250)
     detectorName = models.CharField(max_length=250)
     anomalyValue = models.FloatField(default=None)

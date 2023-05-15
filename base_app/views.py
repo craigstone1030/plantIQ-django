@@ -4,6 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import *
 from .influxDB import *
 import django.core.serializers
+from django.db.models.lookups import *
 
 ######### LOGIN PAGE #########
 @csrf_exempt
@@ -146,7 +147,43 @@ def loadRecords(request):
 
         return JsonResponse({'status': ret, 'data' : result})
     return JsonResponse({'status': 'error', 'data': ''} )
-    
+
+@csrf_exempt
+def loadMonitorsByProcess(request):
+    if request.method == 'GET':
+        processId = request.GET.get("processId")
+
+        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        if process == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {process}'})
+        
+        # influxHandle = getInfluxHandle(dataSource.url, dataSource.token, dataSource.org)
+        # ret, result = getRecords(influxHandle, dataSource.bucket, metric, startAt, stopAt); influxHandle.close(); del influxHandle
+
+        monitorResult = []
+        detectors = ModelDetector.objects.filter(process=process)
+        for detector in detectors:
+            status = ALERT_TYPE_NORMAL; maxAnomaly = None
+            totalAlerts = None; actualScore = None; lastUpdatedAt = None
+
+            histories = ModelAlertHistory.objects.filter(detector=detector)
+            for history in histories:
+                if maxAnomaly == None: maxAnomaly = history.anomalyValue
+                if maxAnomaly > history.anomalyValue: maxAnomaly = history.anomalyValue
+
+            if len(histories) > 0:
+                status = histories.last().alertType
+                actualScore = histories.last().anomalyValue
+                lastUpdatedAt = histories.last().alertAt
+
+            totalAlerts = len(histories)
+
+            monitorResult.append({'status': status, 'maxAnomaly': maxAnomaly, 'totalAlerts': totalAlerts,
+                                  'actualScore': actualScore, 'lastUpdatedAt': lastUpdatedAt})
+        
+        return JsonResponse({'status': 'success', 'data' : monitorResult})
+    return JsonResponse({'status': 'error', 'data': ''} )
+
 ######### METRICS PAGE #########
 @csrf_exempt
 def createProcess(request):
@@ -319,7 +356,6 @@ def deleteDetector(request):
         return JsonResponse({'status': 'success', 'data': ''} )
     return JsonResponse({'status': 'error', 'data': ''} )
 
-
 @csrf_exempt
 def loadDetectors(request):
     detectors = ModelDetector.objects.all()
@@ -405,6 +441,40 @@ def setDetectorStatus(request):
         return JsonResponse({'status': 'success', 'data' : json})
     return JsonResponse({'status': 'error', 'data': ''} )
 
+@csrf_exempt
+def loadGraphData(request):
+    if request.method == 'GET':
+        detectorId = request.GET.get("detectorId")
+        startAt = request.GET.get("startAt")
+        stopAt = request.GET.get("stopAt")
+
+        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if detector == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+        
+        process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
+        if process == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {detector.process_id}'})
+
+        datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
+        if datasource == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})
+        
+        result = map()
+
+        influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
+        ret, records = getDetectorRecords(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt); influxHandle.close(); del influxHandle
+
+        alert = (ModelAlert.objects.filter(detector=detector) or [None])[0]; history = []
+        if startAt != None and stopAt != None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt, endAt__lte=stopAt )
+        elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt )
+        elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__lte=stopAt )
+        else: history = stopAt.objects.filter(detector=detector)
+
+        result = { 'alert': alert, 'histories': history, 'records': records}
+
+        return JsonResponse({'status': ret, 'data' : result})
+    return JsonResponse({'status': 'error', 'data': ''} )
 
 ######### ALERT PAGE #########
 
@@ -490,12 +560,24 @@ def setAlertStatus(request):
     return JsonResponse({'status': 'error', 'data': ''} )
 
 @csrf_exempt
-def loadAlertHistory(request):
+def loadAlertHistoryByDetector(request):
     if request.method == 'GET':
-        
-        history = ModelAlertHistory.objects.all()
-        json = django.core.serializers.serialize('json', history)
 
+        detectorId = request.GET.get('detectorId')
+        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        if detector == None:
+            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+        
+        startAt = request.GET.get('startAt')
+        endAt = request.GET.get('endAt')  
+        
+        history = []
+        if startAt != None and endAt != None : history = ModelAlertHistory.objects.filter(detector=detector, startAt__gte=startAt, endAt__lte=endAt )
+        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(detector=detector, startAt__gte=startAt )
+        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(detector=detector, endAt__lte=endAt )
+        else: history = ModelAlertHistory.objects.filter(detector=detector)
+
+        json = django.core.serializers.serialize('json', history)
         return JsonResponse({'status': 'success', 'data' : json})
         
     return JsonResponse({'status': 'error', 'data': ''} )

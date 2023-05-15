@@ -38,6 +38,7 @@ urlpatterns = [
     path('api/process/metrics', loadMetricsByProcess), # load all process
     path('api/process/detectors', loadDetectorsByProcess), # load all process
     path('api/process/setstatus', setProcessStatus), # set process's status
+    path('api/process/monitors', loadMonitorsByProcess), # load monitors's status by process
 
     # detectors
     path('api/detector/create', createDetector), # create detector
@@ -46,14 +47,16 @@ urlpatterns = [
     path('api/detector/load', loadDetectors), # load all detector
     path('api/detector/process', loadProcessByDetector), # load all detector
     path('api/detector/metrics', loadMetricsByDetector), # load all metrics    
-    path('api/detector/records', loadDetectorRecords), # load all records 
+    path('api/detector/records', loadDetectorRecords), # load all records
     path('api/detector/setstatus', setDetectorStatus), # set detector's status
-    path('api/detector/alerts', loadAlertsByDetector), # delete alert
+    path('api/detector/alerts', loadAlertsByDetector), # load alerts by detector
+    path('api/detector/graphdata', loadGraphData), # load graph's data by one detector, startAt, endAt
 
     # alerts
     path('api/alert/create', createAlert), # create alert
     path('api/alert/update', updateAlert), # update alert
     path('api/alert/delete', deleteAlert), # delete alert
-    path('api/alert/setstatus', setAlertStatus), #  alert
-    path('api/alert/history', loadAlertHistory), # delete alert
+    path('api/alert/setstatus', setAlertStatus), #  set alert's status 
+    path('api/alert/history', loadAlertHistoryByDetector), # get history alert
+
 ]
