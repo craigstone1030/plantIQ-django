@@ -111,7 +111,6 @@ def getDetectorRecords(influxClient, bucket, detectorName, startAt, stopAt):
     except Exception as e:
         return 'error', f'{e}'
     
-
 def rrcf_detect(array, size):
     # Set tree parameters
     num_trees = 40

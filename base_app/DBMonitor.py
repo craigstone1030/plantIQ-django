@@ -176,7 +176,7 @@ def detectAnomaly(detector, detectResult):
                     newAlertType = ALERT_TYPE_NORMAL
                 
                 if newAlertType != -1:
-                    newAlert = ModelAlertHistory(name=alert.name, description=alert.description,
+                    newAlert = ModelAlertHistory(name=alert.name, alert=alert, detector=detector, description=alert.description,
                                 processName=alert.getDetector().getProcess().name, detectorName=alert.getDetector().name,
                                 anomalyValue=value, alertType=newAlertType, alertAt=at )
                     newAlert.save()
@@ -205,7 +205,7 @@ def detectAnomaly(detector, detectResult):
                     newAlertType = ALERT_TYPE_NORMAL
                 
                 if newAlertType != -1:
-                    newAlert = ModelAlertHistory(name=alert.name, description=alert.description,
+                    newAlert = ModelAlertHistory(name=alert.name, alert=alert, detector=detector, description=alert.description,
                                 processName=alert.getDetector().getProcess().name, detectorName=alert.getDetector().name,
                                 anomalyValue=value, alertType=newAlertType, alertAt=at )
                     newAlert.save()

@@ -23,7 +23,7 @@ urlpatterns = [
     # datasource
     path('api/datasource/create', createDatasource), # create new datasource
     path('api/datasource/update', updateDatasource), # update datasource
-    path('api/datasource/delete', deleteDatasource), # delete datasource    
+    path('api/datasource/delete', deleteDatasource), # delete datasource
     path('api/datasource/all', loadDatasources), # load all datasource
 
     # metrics

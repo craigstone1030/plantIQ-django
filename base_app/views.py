@@ -178,7 +178,7 @@ def loadMonitorsByProcess(request):
 
             totalAlerts = len(histories)
 
-            monitorResult.append({'status': status, 'maxAnomaly': maxAnomaly, 'totalAlerts': totalAlerts,
+            monitorResult.append({'detectorId': detector.pk, 'status': status, 'maxAnomaly': maxAnomaly, 'totalAlerts': totalAlerts,
                                   'actualScore': actualScore, 'lastUpdatedAt': lastUpdatedAt})
         
         return JsonResponse({'status': 'success', 'data' : monitorResult})
@@ -293,6 +293,7 @@ def setProcessStatus(request):
     return JsonResponse({'status': 'error', 'data': ''} )
 
 ######### DETECTOR PAGE #########
+
 @csrf_exempt
 def createDetector(request):
     if request.method == 'GET':
@@ -459,19 +460,26 @@ def loadGraphData(request):
         datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
         if datasource == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})
-        
-        result = map()
+    
 
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
         ret, records = getDetectorRecords(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt); influxHandle.close(); del influxHandle
 
         alert = (ModelAlert.objects.filter(detector=detector) or [None])[0]; history = []
-        if startAt != None and stopAt != None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt, endAt__lte=stopAt )
-        elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt )
-        elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__lte=stopAt )
-        else: history = stopAt.objects.filter(detector=detector)
+        if alert != None:
+            if startAt != None and stopAt != None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt, alertAt__lte=stopAt )
+            elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt )
+            elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__lte=stopAt )
+            else: history = stopAt.objects.filter(detector=detector)
 
-        result = { 'alert': alert, 'histories': history, 'records': records}
+
+        result = {
+                    'alert': django.core.serializers.serialize('json',[alert]).strip('[]'),
+                    'histories': django.core.serializers.serialize('json',history),
+                    'records': json.dumps(records, default=str)
+                  }
+        # jsonStr = django.core.serializers.serialize('json',[result])
+        # jsonStr = jsonStr.strip('[]')
 
         return JsonResponse({'status': ret, 'data' : result})
     return JsonResponse({'status': 'error', 'data': ''} )
