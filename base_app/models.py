@@ -2,6 +2,9 @@ from django.db import models
 import json
 import uuid
 from datetime import datetime, timedelta
+from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.base_user import BaseUserManager
+import django.core.serializers
 
 # ALERT TYPE
 ALERT_TYPE_NEAR_CRITIAL = 1
@@ -13,19 +16,15 @@ SC_DETECTOR_UPDATED = "DETECTOR_UPDATED"
 SC_NEW_ALERT = "NEW_ALERTS"
 
 # Create your models here.
-class ModelUser(models.Model):
-    firName = models.CharField(max_length=250)
-    lastName = models.CharField(max_length=250)
+class ModelUser(AbstractUser):
+    # name = models.CharField(max_length=250)
     email = models.CharField(max_length=250)
     mobileNumber = models.CharField(max_length=250)
     company = models.CharField(max_length=250)
-    password = models.CharField(default='', max_length=250)
+    # password = models.CharField(default='', max_length=250)
 
     class Meta:
-        db_table = "tbl_user"   
-
-    def check_password(self, password):
-        return self.password == password
+        db_table = "tbl_user"
 
 class ModelDatasource(models.Model):
     name = models.CharField(max_length=250)
@@ -119,10 +118,22 @@ class ModelAlertHistory(models.Model):
     detectorName = models.CharField(max_length=250)
     anomalyValue = models.FloatField(default=None)
     alertType = models.IntegerField(default=None) # 1: near-critical 2: critical 3: to be normal
-    alertAt = models.DateTimeField(default=datetime.utcnow())
+    alertAt = models.CharField(max_length=250)
 
     class Meta:
         db_table = "tbl_alerthistory"
+
+    def as_json(self):
+        return dict(
+                    id=self.pk,
+                    name=self.name,
+                    description=self.description, 
+                    processName=self.processName,
+                    detectorName=self.detectorName,
+                    anomalyValue=self.anomalyValue,
+                    alertType=self.alertType,
+                    alertAt=self.alertAt
+            )
 
 
 

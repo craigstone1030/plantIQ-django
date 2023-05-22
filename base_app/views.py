@@ -5,8 +5,30 @@ from .models import *
 from .influxDB import *
 import django.core.serializers
 from django.db.models.lookups import *
+import re
+import jwt
+from django.conf import settings
 
-######### LOGIN PAGE #########
+
+def is_valid_email(email):
+    pat = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    if re.match(pat, email):
+        return True
+    return False
+
+def generate_token(modelUser):
+    payload = {
+        'id': modelUser.pk,
+        'email': modelUser.email,
+        'username': modelUser.username,
+        'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    jwt_token = {'token': jwt.encode(payload, settings.JWT_SECRET_KEY)}
+    return jwt_token
+
+
+######### LOGIN PAGE #########    
 @csrf_exempt
 def login(request) :
     email = request.GET.get('email')
@@ -14,44 +36,89 @@ def login(request) :
 
     #   if the user enters an email address then we retrieve the username of the user
     try : 
-        email = ModelUser.objects.get(email=email).username
+        modelUser = ModelUser.objects.get(email=email)
+        bAuthroized = modelUser.check_password(password)
     except : 
         return JsonResponse({'status': 'error', 'data': 'Does not exist!'})
-
-    user = authenticate(request, email=email, password = password)
-
-    if user is None : 
-        JsonResponse({'status': 'error', 'data': 'Not authorized!'})
-    else :
-        request.session['user_id'] = user.pk
-        JsonResponse({'status': 'success', 'data': 'authenticated successfully'})
-
+    
+    if modelUser:
+        if bAuthroized:
+            return JsonResponse({'status':'success', 'data' : generate_token(modelUser)})
+        else:
+            return JsonResponse({'status':'error', 'data' : 'Incorrect password'})
+    else:
+        return JsonResponse({'status':'error', 'data' : 'Invalid credintials'})
+    
+# @csrf_exempt
+# def logout(request):
+#     try:
+#         del request.session['user_id']
+#         request.session.flush()
+#     except KeyError:
+#         pass
+    
 @csrf_exempt
-def logout(request):
+def signup(request):
+
+    if 'username' not in request.GET.keys():
+        return JsonResponse({'status': 'error', 'data': "user name is required"})
+
+    if 'password' not in request.GET.keys():
+        return JsonResponse({'status': 'error', 'data': "Provide password and confirm password"})
+    
+    # if 'mobilenumber' not in request.GET.keys():
+    #     return JsonResponse({'status': 'error', 'data': "user name is required"})
+
+    # if 'company' not in request.GET.keys():
+    #     return JsonResponse({'status': 'error', 'data': "company name is required"})        
+
+    if 'email' in request.GET.keys():
+        if not is_valid_email(request.GET.get('email')):
+            return JsonResponse({'status':'error', 'data': "Invalid email"})
+
+    # if not verify_recaptcha_token_from_request(request):
+    #     return Response({'error': "Recaptcha token verification failed "}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
-        del request.session['user_id']
-        request.session.flush()
-    except KeyError:
-        pass
+        user = ModelUser.objects.get(email=request.GET.get('email'))
+        return JsonResponse({'status':'error', 'data': "Email already exists"})
+    except: pass
+
+    # create the user
+    user = ModelUser(username=request.GET.get('username'), mobileNumber='12311', company='company',
+                     email=request.GET.get('email'))
+    user.set_password(request.GET.get('password'))
+    user.save()
+
+
+    return JsonResponse({'status':'success', 'data': django.core.serializers.serialize('json',[user]).strip('[]')})
     
-def authenticate(request, email = None, password = None) : 
-    try : 
-        #   if the user exists
-        user = ModelUser.objects.get(email = email)
-
-        #   authenticating using password
-        if user.check_password(password) : 
-            return user
-
-        #   if the password is invalid
-        return None
-
-    except: 
+def getLoginedUserInfo(request) : 
+    if 'Authorization' not in request.headers.keys():
         return None
     
+    try :
+        token = request.headers.get("Authorization")
+        decoded_data = jwt.decode(jwt=token, key=settings.JWT_SECRET_KEY, algorithms=["HS256"])
+
+        userId = decoded_data.get("id")
+        
+        user = ModelUser.objects.get(pk = userId)
+        return user
+
+    except:
+        return None
+    
+    # return None
+    
+
 ######### DATSOURCE & METRICS PAGE #########
 @csrf_exempt
 def createDatasource(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         userId = request.GET.get('userId')
         user = (ModelUser.objects.filter(id=userId) or [None])[0]
@@ -72,6 +139,10 @@ def createDatasource(request):
     
 @csrf_exempt
 def updateDatasource(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         dsId = request.GET.get('id')
         curDS = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
@@ -99,6 +170,9 @@ def updateDatasource(request):
     
 @csrf_exempt
 def deleteDatasource(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})    
     if request.method == 'GET':
         dsId = request.GET.get('id')
         curDS = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
@@ -112,12 +186,20 @@ def deleteDatasource(request):
 
 @csrf_exempt
 def loadDatasources(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+    
     connections = ModelDatasource.objects.all()
     json = django.core.serializers.serialize('json',connections)
     return JsonResponse({'status': 'success', 'data': json})
     
 @csrf_exempt
 def loadMetrics(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         dsId = request.GET.get("dsId")
 
@@ -132,6 +214,10 @@ def loadMetrics(request):
     
 @csrf_exempt
 def loadRecords(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         dsId = request.GET.get("dsId")
         metric = request.GET.get("metric")
@@ -150,6 +236,9 @@ def loadRecords(request):
 
 @csrf_exempt
 def loadMonitorsByProcess(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})    
     if request.method == 'GET':
         processId = request.GET.get("processId")
 
@@ -187,6 +276,10 @@ def loadMonitorsByProcess(request):
 ######### METRICS PAGE #########
 @csrf_exempt
 def createProcess(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         dsId = request.GET.get('dsId')
         datasource = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
@@ -205,6 +298,10 @@ def createProcess(request):
 
 @csrf_exempt
 def updateProcess(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         processId = request.GET.get('id')
         curProcess = (ModelProcess.objects.filter(id=processId) or [None])[0]
@@ -223,6 +320,10 @@ def updateProcess(request):
   
 @csrf_exempt
 def deleteProcess(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         processId = request.GET.get('id')
         curProcess = (ModelProcess.objects.filter(id=processId) or [None])[0]
@@ -236,12 +337,20 @@ def deleteProcess(request):
 
 @csrf_exempt
 def loadProcesses(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     processes = ModelProcess.objects.all()
     json = django.core.serializers.serialize('json',processes)
     return JsonResponse({'status': 'success', 'data': json})
   
 @csrf_exempt
 def loadMetricsByProcess(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         processId = request.GET.get("processId")
 
@@ -254,6 +363,10 @@ def loadMetricsByProcess(request):
     
 @csrf_exempt
 def loadDetectorsByProcess(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         processId = request.GET.get("processId")
         process = (ModelProcess.objects.filter(id=processId) or [None])[0]
@@ -267,6 +380,10 @@ def loadDetectorsByProcess(request):
 
 @csrf_exempt
 def setProcessStatus(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         processId = request.GET.get("processId")
         status = request.GET.get("status")
@@ -296,6 +413,10 @@ def setProcessStatus(request):
 
 @csrf_exempt
 def createDetector(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         processId = request.GET.get('processId')
         process = (ModelProcess.objects.filter(id=processId) or [None])[0]
@@ -317,6 +438,10 @@ def createDetector(request):
  
 @csrf_exempt
 def updateDetector(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get('id')
         curDetector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
@@ -346,6 +471,10 @@ def updateDetector(request):
 
 @csrf_exempt
 def deleteDetector(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get('id')
         curDetector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
@@ -358,13 +487,21 @@ def deleteDetector(request):
     return JsonResponse({'status': 'error', 'data': ''} )
 
 @csrf_exempt
-def loadDetectors(request):
+def loadDetectors(request):    
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+    
     detectors = ModelDetector.objects.all()
     json = django.core.serializers.serialize('json',detectors)
     return JsonResponse({'status': 'success', 'data': json})
 
 @csrf_exempt
 def loadProcessByDetector(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get('detectorId')
         detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
@@ -382,6 +519,10 @@ def loadProcessByDetector(request):
 
 @csrf_exempt
 def loadMetricsByDetector(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get('detectorId')
         detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
@@ -396,6 +537,10 @@ def loadMetricsByDetector(request):
 
 @csrf_exempt
 def loadDetectorRecords(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get("detectorId")
         startAt = request.GET.get("startAt")
@@ -421,6 +566,10 @@ def loadDetectorRecords(request):
 
 @csrf_exempt
 def setDetectorStatus(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get("id")
         status = request.GET.get("status")
@@ -444,6 +593,10 @@ def setDetectorStatus(request):
 
 @csrf_exempt
 def loadGraphData(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get("detectorId")
         startAt = request.GET.get("startAt")
@@ -470,14 +623,20 @@ def loadGraphData(request):
             if startAt != None and stopAt != None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt, alertAt__lte=stopAt )
             elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt )
             elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__lte=stopAt )
-            else: history = stopAt.objects.filter(detector=detector)
+            else: history = ModelAlertHistory.objects.filter(detector=detector)
 
+            history_json = [ob.as_json() for ob in history]
 
-        result = {
-                    'alert': django.core.serializers.serialize('json',[alert]).strip('[]'),
-                    'histories': django.core.serializers.serialize('json',history),
-                    'records': json.dumps(records, default=str)
-                  }
+            result = {
+                'alert': django.core.serializers.serialize('json',[alert]).strip('[]'),
+                'histories': history_json,
+                'records': json.dumps(records, default=str)
+            }
+        else:
+            result = {
+                'histories': django.core.serializers.serialize('json',history),
+                'records': json.dumps(records, default=str)
+            }            
         # jsonStr = django.core.serializers.serialize('json',[result])
         # jsonStr = jsonStr.strip('[]')
 
@@ -488,6 +647,10 @@ def loadGraphData(request):
 
 @csrf_exempt
 def createAlert(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get("detectorId")
         detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
@@ -506,6 +669,10 @@ def createAlert(request):
 
 @csrf_exempt
 def updateAlert(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         alertId = request.GET.get("id")
         curAlert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
@@ -526,6 +693,10 @@ def updateAlert(request):
 
 @csrf_exempt
 def deleteAlert(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         alertId = request.GET.get('id')
         curAlert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
@@ -539,6 +710,10 @@ def deleteAlert(request):
 
 @csrf_exempt
 def loadAlertsByDetector(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         detectorId = request.GET.get('detectorId')
         detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
@@ -552,6 +727,10 @@ def loadAlertsByDetector(request):
 
 @csrf_exempt
 def setAlertStatus(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
         alertId = request.GET.get("id")
         status = request.GET.get("status")
@@ -569,21 +748,25 @@ def setAlertStatus(request):
 
 @csrf_exempt
 def loadAlertHistoryByDetector(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
     if request.method == 'GET':
 
-        detectorId = request.GET.get('detectorId')
-        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
-        if detector == None:
-            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+        alertId = request.GET.get('alertId')
+        alert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
+        if alert == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid alert id - {alertId}'})
         
         startAt = request.GET.get('startAt')
         endAt = request.GET.get('endAt')  
         
         history = []
-        if startAt != None and endAt != None : history = ModelAlertHistory.objects.filter(detector=detector, startAt__gte=startAt, endAt__lte=endAt )
-        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(detector=detector, startAt__gte=startAt )
-        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(detector=detector, endAt__lte=endAt )
-        else: history = ModelAlertHistory.objects.filter(detector=detector)
+        if startAt != None and endAt != None : history = ModelAlertHistory.objects.filter(alert=alert, startAt__gte=startAt, endAt__lte=endAt )
+        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(alert=alert, startAt__gte=startAt )
+        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(alert=alert, endAt__lte=endAt )
+        else: history = ModelAlertHistory.objects.filter(alert=alert)
 
         json = django.core.serializers.serialize('json', history)
         return JsonResponse({'status': 'success', 'data' : json})

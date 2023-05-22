@@ -5,7 +5,7 @@ from .EchoServer import *
 from django.conf import settings
 import django.core.serializers
 
-metricList = []
+metricList = [] # this variables are for updating last update dates
 update_callcnt = 0
 
 def indexOfMetric( dsId, metricName ):
@@ -21,7 +21,7 @@ def startScheduler():
     scheduler = BackgroundScheduler()
     scheduler.add_job(run, 'interval', seconds=settings.UPDATE_INTERVAL)
     scheduler.add_job(socket_handler, 'interval', seconds=1)
-    scheduler.add_job(processDetector, 'interval', seconds=5)
+    # scheduler.add_job(processDetector, 'interval', seconds=5)
     scheduler.start()
 
     run()
@@ -148,7 +148,6 @@ def run():
         
 # detectResult: should be sorted by datetime
 def detectAnomaly(detector, detectResult): 
-
     alertHistorys = []
 
     alerts = ModelAlert.objects.filter(detector=detector)
@@ -176,6 +175,7 @@ def detectAnomaly(detector, detectResult):
                     newAlertType = ALERT_TYPE_NORMAL
                 
                 if newAlertType != -1:
+                    print("anomaly value:", detectItem[2], value)
                     newAlert = ModelAlertHistory(name=alert.name, alert=alert, detector=detector, description=alert.description,
                                 processName=alert.getDetector().getProcess().name, detectorName=alert.getDetector().name,
                                 anomalyValue=value, alertType=newAlertType, alertAt=at )
@@ -218,7 +218,11 @@ def detectAnomaly(detector, detectResult):
                 pLevel = cLevel; pDetectItem = detectItem
     
         if len(alertHistorys) > 0:
+            print("New alerts in", detector.pk, " count:", len(alertHistorys))
+            
+            history_json = [ob.as_json() for ob in alertHistorys]
+
             boradcast(json.dumps({
             "type": SC_NEW_ALERT,
-            "detector": django.core.serializers.serialize('json',[detector]).strip('[]'), 
-            "alerts": django.core.serializers.serialize('json',alertHistorys)}))
+            "detectorId": detector.id, 
+            "alerts": json.dumps(history_json)}))

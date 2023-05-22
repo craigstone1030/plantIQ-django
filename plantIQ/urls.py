@@ -20,6 +20,10 @@ from base_app.views import *
 urlpatterns = [
     path('admin/', admin.site.urls),
 
+    # Login
+    path('login', login),
+    path('signup', signup),
+
     # datasource
     path('api/datasource/create', createDatasource), # create new datasource
     path('api/datasource/update', updateDatasource), # update datasource
