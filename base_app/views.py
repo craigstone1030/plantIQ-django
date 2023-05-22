@@ -111,7 +111,6 @@ def getLoginedUserInfo(request) :
     
     # return None
     
-
 ######### DATSOURCE & METRICS PAGE #########
 @csrf_exempt
 def createDatasource(request):
@@ -120,7 +119,7 @@ def createDatasource(request):
         return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
         
     if request.method == 'GET':
-        userId = request.GET.get('userId')
+        userId = modelUser.pk
         user = (ModelUser.objects.filter(id=userId) or [None])[0]
         if user == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid user id - {userId}'})
@@ -149,7 +148,7 @@ def updateDatasource(request):
         if curDS == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid datasource id - {dsId}'})
         
-        userId = request.GET.get('userId')
+        userId = modelUser.pk
         user = (ModelUser.objects.filter(id=userId) or [None])[0]
         if user == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid user id - {userId}'})
@@ -172,7 +171,8 @@ def updateDatasource(request):
 def deleteDatasource(request):
     modelUser = getLoginedUserInfo(request)
     if modelUser == None:
-        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})    
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'}) 
+       
     if request.method == 'GET':
         dsId = request.GET.get('id')
         curDS = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
@@ -190,7 +190,7 @@ def loadDatasources(request):
     if modelUser == None:
         return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
     
-    connections = ModelDatasource.objects.all()
+    connections = ModelDatasource.objects.filter(user=modelUser)
     json = django.core.serializers.serialize('json',connections)
     return JsonResponse({'status': 'success', 'data': json})
     
@@ -238,7 +238,8 @@ def loadRecords(request):
 def loadMonitorsByProcess(request):
     modelUser = getLoginedUserInfo(request)
     if modelUser == None:
-        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})    
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+    
     if request.method == 'GET':
         processId = request.GET.get("processId")
 
@@ -341,7 +342,8 @@ def loadProcesses(request):
     if modelUser == None:
         return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
         
-    processes = ModelProcess.objects.all()
+    # processes = ModelProcess.objects.all( datasource in ModelDatasource.getMyDatasourceIdList() )
+    processes = ModelProcess.getProcessListByUserId(modelUser.pk)
     json = django.core.serializers.serialize('json',processes)
     return JsonResponse({'status': 'success', 'data': json})
   
@@ -492,7 +494,8 @@ def loadDetectors(request):
     if modelUser == None:
         return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
     
-    detectors = ModelDetector.objects.all()
+    # detectors = ModelDetector.objects.all()
+    detectors = ModelDetector.getDetectorListByUserId(modelUser.pk)
     json = django.core.serializers.serialize('json',detectors)
     return JsonResponse({'status': 'success', 'data': json})
 

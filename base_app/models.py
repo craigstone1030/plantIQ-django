@@ -38,6 +38,11 @@ class ModelDatasource(models.Model):
     class Meta:
         db_table = "tbl_datasource"
 
+    def getMyDatasourceIdList(userId):
+        modelDSList = ModelDatasource.objects.filter(user_id=userId)
+        result = [ds.id for ds in modelDSList]
+        return result
+
 class ModelProcess(models.Model):
     name = models.CharField(max_length=250)
     description = models.CharField(max_length=250)
@@ -50,6 +55,17 @@ class ModelProcess(models.Model):
 
     def getMetricList(self):
         return json.loads(self.metricList)
+    
+    def getProcessListByUserId(userId):
+        allProcess = ModelProcess.objects.all()
+        filterProcess = []
+
+        for process in allProcess:
+            if process.pk in ModelDatasource.getMyDatasourceIdList(userId):
+                filterProcess.push(process)
+
+        return filterProcess
+
 
     class Meta:
         db_table = "tbl_process"
@@ -87,6 +103,18 @@ class ModelDetector(models.Model):
 
         datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
         return datasource
+    
+    def getDetectorListByUserId(userId):
+        allDetector = ModelDetector.objects.all()
+        filterProcesses = ModelProcess.getProcessListByUserId(userId)
+        filterProcessIdList = [ model.id for model in filterProcesses ]
+        filterDetector = []
+
+        for detector in allDetector:
+            if detector.pk in filterProcessIdList:
+                filterDetector.push(detector)
+
+        return filterDetector    
     
     class Meta:
         db_table = "tbl_detector"
