@@ -62,7 +62,7 @@ class ModelProcess(models.Model):
 
         for process in allProcess:
             if process.pk in ModelDatasource.getMyDatasourceIdList(userId):
-                filterProcess.push(process)
+                filterProcess.append(process)
 
         return filterProcess
 
@@ -111,8 +111,8 @@ class ModelDetector(models.Model):
         filterDetector = []
 
         for detector in allDetector:
-            if detector.pk in filterProcessIdList:
-                filterDetector.push(detector)
+            if detector.process_id in filterProcessIdList:
+                filterDetector.append(detector)
 
         return filterDetector    
     

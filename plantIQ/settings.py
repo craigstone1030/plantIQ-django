@@ -134,7 +134,7 @@ INFLUX_API_TOKEN = "Z0l0UrvG0xBdYN-zv4wBH6TCYn_g5nQ6GfoXnF67Av9Aj6YFh1cpo8mDLw2D
 INFLUX_URL = "https://us-east-1-1.aws.cloud2.influxdata.com"
 INFLUX_ORG = "Vostok Games"
 
-UPDATE_INTERVAL = 30
+UPDATE_INTERVAL = 60 * 10
 WEBSOCKET_PORT = 8089
 
 AUTH_USER_MODEL = "base_app.ModelUser" 

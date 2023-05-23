@@ -574,7 +574,7 @@ def setDetectorStatus(request):
         return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
         
     if request.method == 'GET':
-        detectorId = request.GET.get("id")
+        detectorId = request.GET.get("detectorId")
         status = request.GET.get("status")
         detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
         if detector == None:
