@@ -646,6 +646,10 @@ def loadGraphData(request):
         return JsonResponse({'status': ret, 'data' : result})
     return JsonResponse({'status': 'error', 'data': ''} )
 
+# @csrf_exempt
+# def loadSkeletonGraphData(reqeust):
+
+
 ######### ALERT PAGE #########
 
 @csrf_exempt

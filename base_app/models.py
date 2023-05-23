@@ -61,7 +61,7 @@ class ModelProcess(models.Model):
         filterProcess = []
 
         for process in allProcess:
-            if process.pk in ModelDatasource.getMyDatasourceIdList(userId):
+            if process.datasource_id in ModelDatasource.getMyDatasourceIdList(userId):
                 filterProcess.append(process)
 
         return filterProcess
