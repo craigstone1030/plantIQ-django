@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import IsolationForest
 import uuid
 import rrcf
+import warnings
+from influxdb_client.client.warnings import MissingPivotFunction
 
 #token = os.environ.get("INFLUXDB_TOKEN")
 
@@ -22,6 +24,7 @@ import rrcf
 # bucket="data2"
 
 def getInfluxHandle(url, token, org):
+    warnings.simplefilter("ignore", MissingPivotFunction)
     return influxdb_client.InfluxDBClient(url=url, token=token, org=org)
 
 def getAllMeasurements(influxClient, bucket):
@@ -169,6 +172,7 @@ def detectMetrics(influxClient, bucket, measurementList, startAt, stopAt):
         query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
         query += f' |> drop(columns:["_start", "_stop", "_measurement", "result", "table"])'
         query += f' |> yield(name: "result") \n'
+        query
         data_frame = query_api.query_data_frame(org=settings.INFLUX_ORG, query=query)
         data["time"] = data_frame['_time']
         data[f"value{i}"] = data_frame['_value']
@@ -195,7 +199,7 @@ def detectMetrics(influxClient, bucket, measurementList, startAt, stopAt):
     # model.fit(detectorFrame[variable_columns])
 
     # detectorFrame['scores']=model.decision_function(detectorFrame[variable_columns])
-    # detectorFrame['anomaly']=model.predict(detectorFrame[variable_columns])  
+    # detectorFrame['anomaly']=model.predict(detectorFrame[variable_columns])
 
     # results = []
     # for ind in detectorFrame.index:
@@ -206,7 +210,10 @@ def detectMetrics(influxClient, bucket, measurementList, startAt, stopAt):
     np_data = np.average(np_data, axis=1, weights=rate_columns)
 
     # Generate data
-    anomaly_results = rrcf_detect(np_data.tolist(), 4)
+    try:
+        anomaly_results = rrcf_detect(np_data.tolist(), 4)
+    except Exception as e:
+        return 'error', []
     
     distance = datetime.strptime(stopAt, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp() - datetime.strptime(startAt, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
     dtInd = datetime.strptime(startAt, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
@@ -215,8 +222,6 @@ def detectMetrics(influxClient, bucket, measurementList, startAt, stopAt):
         results.append(["value", datetime.fromtimestamp(dtInd).strftime('%Y-%m-%dT%H:%M:%S.%fZ'), anomaly_results[i]])
         dtInd = dtInd + distance / len(anomaly_results)
 
-    # print( results )
-    
     return 'success', results
 
 def updateDetection(influxClient, bucket, org, detectorName, measurementList, startAt, stopAt):
@@ -245,7 +250,13 @@ def isUpdateAvailable(influxClient, bucket, measurement, lastUpdatedAt):
     query += f' |> last()'
 
     bUpdate = False
-    result = query_api.query(org=settings.INFLUX_ORG, query=query)
+
+    try:
+        result = query_api.query(org=settings.INFLUX_ORG, query=query)
+    except Exception as e:
+        print(f'{e}')
+        result = []
+
     if len(result) > 0:
         lastUpdatedAt = result[0].records[0]["_time"]
         # + timedelta(seconds=1)
@@ -274,3 +285,47 @@ def getInitialAt(influxClient, bucket, measurement):
         initialAt = initialAt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
     return initialAt
+
+def getMaxAnomaly(influxClient, bucket, measurement, startAt, stopAt):
+    query_api = influxClient.query_api()
+
+    query = ''
+    if startAt == None and stopAt == None:
+        query += f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z)'
+    elif stopAt == None:
+        query += f'from(bucket: "{bucket}") |> range(start: {startAt})'
+    elif startAt == None:
+        query += f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z, stop:{stopAt})'
+    else:
+        query += f'from(bucket: "{bucket}") |> range(start: {startAt}, stop:{stopAt})'
+    query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
+    query += f' |> max(column: "_value")'
+
+    result = query_api.query(org=settings.INFLUX_ORG, query=query)
+    if len(result) > 0: maxValue = result[0].records[0].values['_value']
+    else: maxValue = 0
+
+    return maxValue
+
+def getLastValue(influxClient, bucket, measurement, startAt, stopAt):
+    query_api = influxClient.query_api()
+
+    query = ''
+    if startAt == None and stopAt == None:
+        query += f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z)'
+    elif stopAt == None:
+        query += f'from(bucket: "{bucket}") |> range(start: {startAt})'
+    elif startAt == None:
+        query += f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z, stop:{stopAt})'
+    else:
+        query += f'from(bucket: "{bucket}") |> range(start: {startAt}, stop:{stopAt})'
+    query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
+    query += f' |> sort(columns: ["_time"], desc: false)'
+    query += f' |> first(column: "_value")'
+
+    result = query_api.query(org=settings.INFLUX_ORG, query=query)
+    if len(result) > 0: maxValue = result[0].records[0].values['_value']
+    else: maxValue = 0
+
+    return maxValue
+

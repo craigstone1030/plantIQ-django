@@ -130,13 +130,13 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CORS_ALLOW_ALL_ORIGINS = True
 
 # User Own Config
+AUTH_USER_MODEL = "base_app.ModelUser" 
+JWT_SECRET_KEY = "PlatIQ"
+
 INFLUX_API_TOKEN = "Z0l0UrvG0xBdYN-zv4wBH6TCYn_g5nQ6GfoXnF67Av9Aj6YFh1cpo8mDLw2DfGeMsRbxpwhQXgqz_hnjvfhwMg=="
 INFLUX_URL = "https://us-east-1-1.aws.cloud2.influxdata.com"
 INFLUX_ORG = "Vostok Games"
 
-UPDATE_INTERVAL = 60 * 10
+UPDATE_INTERVAL = 60 * 5
+UPDATE_DATASOURCE_INTERVAL = 15
 WEBSOCKET_PORT = 8089
-
-AUTH_USER_MODEL = "base_app.ModelUser" 
-
-JWT_SECRET_KEY = "PlatIQ"

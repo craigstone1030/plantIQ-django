@@ -55,6 +55,7 @@ urlpatterns = [
     path('api/detector/setstatus', setDetectorStatus), # set detector's status
     path('api/detector/alerts', loadAlertsByDetector), # load alerts by detector
     path('api/detector/graphdata', loadGraphData), # load graph's data by one detector, startAt, endAt
+    path('api/detector/trendgraphdata', loadSkeletonGraphData), # load skeleton trend graph's data by one detector.
 
     # alerts
     path('api/alert/create', createAlert), # create alert

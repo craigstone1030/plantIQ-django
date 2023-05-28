@@ -242,13 +242,18 @@ def loadMonitorsByProcess(request):
     
     if request.method == 'GET':
         processId = request.GET.get("processId")
+        startAt = request.GET.get("startAt")
+        stopAt = request.GET.get("stopAt")
 
         process = (ModelProcess.objects.filter(id=processId) or [None])[0]
         if process == None:
-            return JsonResponse({'status': 'error', 'error': 'Invalid process id - {process}'})
+            return JsonResponse({'status': 'error', 'error': f'Invalid process id - {process}'})
         
-        # influxHandle = getInfluxHandle(dataSource.url, dataSource.token, dataSource.org)
-        # ret, result = getRecords(influxHandle, dataSource.bucket, metric, startAt, stopAt); influxHandle.close(); del influxHandle
+        datasource = process.getDatasource()
+        if datasource == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid datasource id - {datasource}'})        
+                
+        influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
 
         monitorResult = []
         detectors = ModelDetector.objects.filter(process=process)
@@ -256,20 +261,28 @@ def loadMonitorsByProcess(request):
             status = ALERT_TYPE_NORMAL; maxAnomaly = None
             totalAlerts = None; actualScore = None; lastUpdatedAt = None
 
-            histories = ModelAlertHistory.objects.filter(detector=detector)
-            for history in histories:
-                if maxAnomaly == None: maxAnomaly = history.anomalyValue
-                if maxAnomaly > history.anomalyValue: maxAnomaly = history.anomalyValue
+            maxAnomaly = getMaxAnomaly(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt)
+            actualScore = getLastValue(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt)
 
-            if len(histories) > 0:
-                status = histories.last().alertType
-                actualScore = histories.last().anomalyValue
-                lastUpdatedAt = histories.last().alertAt
+            if startAt != None and stopAt != None : histories = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt, alertAt__lte=stopAt )
+            elif startAt != None and stopAt == None : histories = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt )
+            elif startAt != None and stopAt == None : histories = ModelAlertHistory.objects.filter(detector=detector, alertAt__lte=stopAt )
+            else: histories = ModelAlertHistory.objects.filter(detector=detector)
+
+            # for history in histories:
+            #     if maxAnomaly == None: maxAnomaly = history.anomalyValue
+            #     if maxAnomaly > history.anomalyValue: maxAnomaly = history.anomalyValue
+
+            if len(histories) > 0: status = histories.last().alertType
+
+            lastUpdatedAt = histories.last().alertAt
 
             totalAlerts = len(histories)
 
-            monitorResult.append({'detectorId': detector.pk, 'status': status, 'maxAnomaly': maxAnomaly, 'totalAlerts': totalAlerts,
+            monitorResult.append({'name': detector.name, 'detectorId': detector.pk, 'status': status, 'maxAnomaly': maxAnomaly, 'totalAlerts': totalAlerts,
                                   'actualScore': actualScore, 'lastUpdatedAt': lastUpdatedAt})
+            
+        influxHandle.close(); del influxHandle
         
         return JsonResponse({'status': 'success', 'data' : monitorResult})
     return JsonResponse({'status': 'error', 'data': ''} )
@@ -607,7 +620,7 @@ def loadGraphData(request):
 
         detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
         if detector == None:
-            return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
+            return JsonResponse({'status': 'error', 'error': f'Invalid detector id - {detectorId}'})
         
         process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
         if process == None:
@@ -646,8 +659,37 @@ def loadGraphData(request):
         return JsonResponse({'status': ret, 'data' : result})
     return JsonResponse({'status': 'error', 'data': ''} )
 
-# @csrf_exempt
-# def loadSkeletonGraphData(reqeust):
+@csrf_exempt
+def loadSkeletonGraphData(request):
+    modelUser = getLoginedUserInfo(request)
+    if modelUser == None:
+        return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
+        
+    if request.method == 'GET':
+        detectorId = request.GET.get("detectorId")
+
+        modelDetector = (ModelDetector.objects.filter(pk=detectorId) or [None])[0]
+        if modelDetector == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid detector id - {detectorId}'})
+        
+        if modelDetector.lastUpdate == 'None':
+            return JsonResponse({'status': 'error', 'error': f'No data yet'}) 
+
+        datasource = modelDetector.getDatasource()
+        if datasource == None:
+            return JsonResponse({'status': 'error', 'error': f'Invalid datasource id'})
+        
+        stopAt = modelDetector.lastUpdate
+        startAt = datetime.fromtimestamp( datetime.strptime(stopAt, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp() - settings.UPDATE_INTERVAL * 5 ).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
+        print(startAt, stopAt)
+
+        influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
+        ret, records = getDetectorRecords(influxHandle, datasource.bucket, modelDetector.exportCode, startAt, stopAt); influxHandle.close(); del influxHandle
+
+        return JsonResponse({'status': ret, 'data' : records})
+    return JsonResponse({'status': 'error', 'data': '[]'} )
+
 
 
 ######### ALERT PAGE #########

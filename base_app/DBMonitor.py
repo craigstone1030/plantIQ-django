@@ -4,9 +4,13 @@ from .influxDB import *
 from .EchoServer import *
 from django.conf import settings
 import django.core.serializers
+from .DetectorThread import DetectorThread
+from .MeasurementThread import MeasurementThread
 
-metricList = [] # this variables are for updating last update dates
-update_callcnt = 0
+# metricList = [] # this variables are for updating last update dates
+# update_callcnt = 0
+detectThreadList = []
+metricThreadList = []
 
 def indexOfMetric( dsId, metricName ):
     i = 0
@@ -19,12 +23,26 @@ def indexOfMetric( dsId, metricName ):
 def startScheduler():
 
     scheduler = BackgroundScheduler()
-    scheduler.add_job(run, 'interval', seconds=settings.UPDATE_INTERVAL)
+    # scheduler.add_job(run, 'interval', seconds=settings.UPDATE_INTERVAL)
     scheduler.add_job(socket_handler, 'interval', seconds=1)
     # scheduler.add_job(processDetector, 'interval', seconds=5)
     scheduler.start()
 
-    run()
+    # run()
+
+    detectors = ModelDetector.objects.all()
+    for detector in detectors:
+        thread = DetectorThread(detector.pk)
+        thread.start()
+
+        detectThreadList.append(thread)
+
+    datasources = ModelDatasource.objects.all()
+    for datasource in datasources:
+        thread = MeasurementThread(datasource.pk)
+        thread.start()
+
+        metricThreadList.append(thread)
 
 def processDetector():
     detectors = ModelDetector.objects.all()
@@ -65,6 +83,7 @@ def processDetector():
 
 def socket_handler():
     websocketServer.handle_request()
+
 
 def run():
     global metricList
@@ -137,6 +156,7 @@ def run():
         
         detectAnomaly( detector, detectResult )
 
+        detector.lastScore = detectResult[len(detectResult) - 1][1]
         detector.lastUpdate = stopUpdatedAt
         detector.save()
 
@@ -158,6 +178,10 @@ def detectAnomaly(detector, detectResult):
             pLevel = 0; cLevel = 0
             for detectItem in detectResult:
                 at = detectItem[1]; value = detectItem[2]
+
+                if detector.maxAnomaly < detectItem[2]:
+                    detector.maxAnomaly = detectItem[2]
+                    detector.save()
 
                 if value < alert.nearCriticalTreshold:
                     cLevel = 0
@@ -188,6 +212,10 @@ def detectAnomaly(detector, detectResult):
             pLevel = 0; cLevel = 0; pDuration = 0; pDetectItem = None
             for detectItem in detectResult:
                 at = detectItem[1]; value = detectItem[2]
+
+                if detector.maxAnomaly < detectItem[2]:
+                    detector.maxAnomaly = detectItem[2]
+                    detector.save()
 
                 if value < alert.nearCriticalTreshold:
                     cLevel = 0

@@ -14,6 +14,7 @@ ALERT_TYPE_NORMAL = 3
 # PACKET TYPE
 SC_DETECTOR_UPDATED = "DETECTOR_UPDATED"
 SC_NEW_ALERT = "NEW_ALERTS"
+SC_METRIC_UPDATED = "SC_METRIC_UPDATED"
 
 # Create your models here.
 class ModelUser(AbstractUser):
@@ -65,6 +66,10 @@ class ModelProcess(models.Model):
                 filterProcess.append(process)
 
         return filterProcess
+    
+    def getDatasource(self):
+        datasource = (ModelDatasource.objects.filter(id=self.datasource_id) or [None])[0]
+        return datasource    
 
 
     class Meta:
@@ -78,6 +83,8 @@ class ModelDetector(models.Model):
     exportCode = models.CharField(default='', max_length=250)
     lastUpdate = models.CharField(default='None', max_length=250)
     status = models.IntegerField(default=1)
+    maxAnomaly = models.FloatField(default=0)
+    lastScore = models.FloatField(default=0)
 
     def is_valid_uuid(self, value):
         try:
