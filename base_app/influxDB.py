@@ -80,7 +80,11 @@ def getRecords(influxClient, bucket, measurement, startAt, stopAt):
         datas = [ ]
         for table in result:
             for row in table.records:
-                datas.append( [ row.values["_field"], row.values["_time"], row.values["_value"] ] )
+                try:
+                    dt = datetime.strptime(row.values["_time"], "%Y-%m-%d %H:%M:%S.%f%z").strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+                    datas.append( [ row.values["_field"], dt, row.values["_value"] ] )
+                except:
+                    datas.append( [ row.values["_field"], row.values["_time"], row.values["_value"] ] )
 
         return 'success', datas
     except Exception as e:
@@ -108,7 +112,12 @@ def getDetectorRecords(influxClient, bucket, detectorName, startAt, stopAt):
         datas = [ ]
         for table in result:
             for row in table.records:
-                datas.append( [ row.values["_field"], row.values["_time"], row.values["_value"] ] )
+
+                rfc3339_string = row.values["_time"].strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+                datas.append( [ row.values["_field"], rfc3339_string, row.values["_value"] ] )
+
+                
+                
 
         return 'success', datas
     except Exception as e:

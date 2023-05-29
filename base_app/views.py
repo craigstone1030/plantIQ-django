@@ -1,13 +1,17 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from .models import *
-from .influxDB import *
-import django.core.serializers
 from django.db.models.lookups import *
+from django.conf import settings
+
+import django.core.serializers
 import re
 import jwt
-from django.conf import settings
+
+
+from .models import *
+from .influxDB import *
+from .DBMonitor import createNewDatasource, createNewDetector, deleteDatasource, deleteDetector
 
 
 def is_valid_email(email):
@@ -120,7 +124,7 @@ def createDatasource(request):
         
     if request.method == 'GET':
         userId = modelUser.pk
-        user = (ModelUser.objects.filter(id=userId) or [None])[0]
+        user = (ModelUser.objects.filter(id=userId, deleted=0) or [None])[0]
         if user == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid user id - {userId}'})
         
@@ -144,12 +148,12 @@ def updateDatasource(request):
         
     if request.method == 'GET':
         dsId = request.GET.get('id')
-        curDS = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
+        curDS = (ModelDatasource.objects.filter(id=dsId, deleted=0) or [None])[0]
         if curDS == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid datasource id - {dsId}'})
         
         userId = modelUser.pk
-        user = (ModelUser.objects.filter(id=userId) or [None])[0]
+        user = (ModelUser.objects.filter(id=userId, deleted=0) or [None])[0]
         if user == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid user id - {userId}'})
         
@@ -175,7 +179,7 @@ def deleteDatasource(request):
        
     if request.method == 'GET':
         dsId = request.GET.get('id')
-        curDS = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
+        curDS = (ModelDatasource.objects.filter(id=dsId, deleted=0) or [None])[0]
         if curDS == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
         
@@ -190,7 +194,7 @@ def loadDatasources(request):
     if modelUser == None:
         return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
     
-    connections = ModelDatasource.objects.filter(user=modelUser)
+    connections = ModelDatasource.objects.filter(user=modelUser, deleted=0)
     json = django.core.serializers.serialize('json',connections)
     return JsonResponse({'status': 'success', 'data': json})
     
@@ -245,7 +249,7 @@ def loadMonitorsByProcess(request):
         startAt = request.GET.get("startAt")
         stopAt = request.GET.get("stopAt")
 
-        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        process = (ModelProcess.objects.filter(id=processId, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid process id - {process}'})
         
@@ -256,7 +260,7 @@ def loadMonitorsByProcess(request):
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
 
         monitorResult = []
-        detectors = ModelDetector.objects.filter(process=process)
+        detectors = ModelDetector.objects.filter(process=process, deleted=0)
         for detector in detectors:
             status = ALERT_TYPE_NORMAL; maxAnomaly = None
             totalAlerts = None; actualScore = None; lastUpdatedAt = None
@@ -273,9 +277,10 @@ def loadMonitorsByProcess(request):
             #     if maxAnomaly == None: maxAnomaly = history.anomalyValue
             #     if maxAnomaly > history.anomalyValue: maxAnomaly = history.anomalyValue
 
-            if len(histories) > 0: status = histories.last().alertType
+            if len(histories) > 0:
+                status = histories.last().alertType
 
-            lastUpdatedAt = histories.last().alertAt
+            lastUpdatedAt = detector.lastUpdate
 
             totalAlerts = len(histories)
 
@@ -296,7 +301,7 @@ def createProcess(request):
         
     if request.method == 'GET':
         dsId = request.GET.get('dsId')
-        datasource = (ModelDatasource.objects.filter(id=dsId) or [None])[0]
+        datasource = (ModelDatasource.objects.filter(id=dsId, deleted=0) or [None])[0]
         if datasource == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {dsId}'})
 
@@ -318,7 +323,7 @@ def updateProcess(request):
         
     if request.method == 'GET':
         processId = request.GET.get('id')
-        curProcess = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        curProcess = (ModelProcess.objects.filter(id=processId, deleted=0) or [None])[0]
         if curProcess == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
                 
@@ -340,7 +345,7 @@ def deleteProcess(request):
         
     if request.method == 'GET':
         processId = request.GET.get('id')
-        curProcess = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        curProcess = (ModelProcess.objects.filter(id=processId, deleted=0) or [None])[0]
         if curProcess == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
         
@@ -369,7 +374,7 @@ def loadMetricsByProcess(request):
     if request.method == 'GET':
         processId = request.GET.get("processId")
 
-        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        process = (ModelProcess.objects.filter(id=processId, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
         
@@ -384,11 +389,11 @@ def loadDetectorsByProcess(request):
         
     if request.method == 'GET':
         processId = request.GET.get("processId")
-        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        process = (ModelProcess.objects.filter(id=processId, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
         
-        detectors = ModelDetector.objects.filter(process=process)
+        detectors = ModelDetector.objects.filter(process=process, deleted=0)
         json = django.core.serializers.serialize('json',detectors)
         return JsonResponse({'status': 'success', 'data' : json})
     return JsonResponse({'status': 'error', 'data': ''} )
@@ -402,17 +407,17 @@ def setProcessStatus(request):
     if request.method == 'GET':
         processId = request.GET.get("processId")
         status = request.GET.get("status")
-        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        process = (ModelProcess.objects.filter(id=processId, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid process id - {processId}'})
         
         process.status = status
-        detectors = ModelDetector.objects.filter(process=process)
+        detectors = ModelDetector.objects.filter(process=process, deleted=0)
         for detector in detectors:
             detector.status = status
             detector.save()
 
-            alerts = ModelAlert.objects.filter(detector=detector)
+            alerts = ModelAlert.objects.filter(detector=detector, deleted=0)
             for alert in alerts:
                 alert.status = status
                 alert.save()
@@ -434,7 +439,7 @@ def createDetector(request):
         
     if request.method == 'GET':
         processId = request.GET.get('processId')
-        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        process = (ModelProcess.objects.filter(id=processId, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
 
@@ -459,12 +464,12 @@ def updateDetector(request):
         
     if request.method == 'GET':
         detectorId = request.GET.get('id')
-        curDetector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        curDetector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if curDetector == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {variable}'})
         
         processId = request.GET.get('processId')
-        process = (ModelProcess.objects.filter(id=processId) or [None])[0]
+        process = (ModelProcess.objects.filter(id=processId, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {processId}'})
                 
@@ -492,7 +497,7 @@ def deleteDetector(request):
         
     if request.method == 'GET':
         detectorId = request.GET.get('id')
-        curDetector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        curDetector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if curDetector == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
         
@@ -520,11 +525,11 @@ def loadProcessByDetector(request):
         
     if request.method == 'GET':
         detectorId = request.GET.get('detectorId')
-        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        detector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if detector == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
 
-        process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
+        process = (ModelProcess.objects.filter(id=detector.process_id, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {process_id.process} at detector id - {detectorId}'})
         
@@ -541,11 +546,11 @@ def loadMetricsByDetector(request):
         
     if request.method == 'GET':
         detectorId = request.GET.get('detectorId')
-        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        detector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if detector == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
 
-        process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
+        process = (ModelProcess.objects.filter(id=detector.process_id, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {process_id.process} at detector id - {detectorId}'})
         return JsonResponse({'status': 'success', 'data' : detector.getMetricList()})
@@ -562,15 +567,15 @@ def loadDetectorRecords(request):
         startAt = request.GET.get("startAt")
         stopAt = request.GET.get("stopAt")
 
-        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        detector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if detector == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
         
-        process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
+        process = (ModelProcess.objects.filter(id=detector.process_id, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {detector.process_id}'})
 
-        datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
+        datasource = (ModelDatasource.objects.filter(id=process.datasource_id, deleted=0) or [None])[0]
         if datasource == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})
         
@@ -589,14 +594,14 @@ def setDetectorStatus(request):
     if request.method == 'GET':
         detectorId = request.GET.get("detectorId")
         status = request.GET.get("status")
-        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        detector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if detector == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid detector id - {detectorId}'})
         
         detector.status = status
         detector.save()
 
-        alerts = ModelAlert.objects.filter(detector=detector)
+        alerts = ModelAlert.objects.filter(detector=detector, deleted=0)
         for alert in alerts:
             alert.status = status
             alert.save()
@@ -618,23 +623,24 @@ def loadGraphData(request):
         startAt = request.GET.get("startAt")
         stopAt = request.GET.get("stopAt")
 
-        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        detector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if detector == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid detector id - {detectorId}'})
         
-        process = (ModelProcess.objects.filter(id=detector.process_id) or [None])[0]
+        process = (ModelProcess.objects.filter(id=detector.process_id, deleted=0) or [None])[0]
         if process == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid process id - {detector.process_id}'})
 
-        datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
+        datasource = (ModelDatasource.objects.filter(id=process.datasource_id, deleted=0) or [None])[0]
         if datasource == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid datasource id - {process.datasource_id}'})
     
 
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
-        ret, records = getDetectorRecords(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt); influxHandle.close(); del influxHandle
+        ret, records = getDetectorRecords(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt);
+        influxHandle.close(); del influxHandle
 
-        alert = (ModelAlert.objects.filter(detector=detector) or [None])[0]; history = []
+        alert = (ModelAlert.objects.filter(detector=detector, deleted=0) or [None])[0]; history = []
         if alert != None:
             if startAt != None and stopAt != None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt, alertAt__lte=stopAt )
             elif startAt != None and stopAt == None : history = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt )
@@ -668,12 +674,12 @@ def loadSkeletonGraphData(request):
     if request.method == 'GET':
         detectorId = request.GET.get("detectorId")
 
-        modelDetector = (ModelDetector.objects.filter(pk=detectorId) or [None])[0]
+        modelDetector = (ModelDetector.objects.filter(pk=detectorId, deleted=0) or [None])[0]
         if modelDetector == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid detector id - {detectorId}'})
         
         if modelDetector.lastUpdate == 'None':
-            return JsonResponse({'status': 'error', 'error': f'No data yet'}) 
+            return JsonResponse({'status': 'success', 'data': []}) 
 
         datasource = modelDetector.getDatasource()
         if datasource == None:
@@ -681,14 +687,12 @@ def loadSkeletonGraphData(request):
         
         stopAt = modelDetector.lastUpdate
         startAt = datetime.fromtimestamp( datetime.strptime(stopAt, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp() - settings.UPDATE_INTERVAL * 5 ).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-
-        print(startAt, stopAt)
-
+        
         influxHandle = getInfluxHandle(datasource.url, datasource.token, datasource.org)
         ret, records = getDetectorRecords(influxHandle, datasource.bucket, modelDetector.exportCode, startAt, stopAt); influxHandle.close(); del influxHandle
 
         return JsonResponse({'status': ret, 'data' : records})
-    return JsonResponse({'status': 'error', 'data': '[]'} )
+    return JsonResponse({'status': 'sucess', 'data': []} )
 
 
 
@@ -702,7 +706,7 @@ def createAlert(request):
         
     if request.method == 'GET':
         detectorId = request.GET.get("detectorId")
-        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        detector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if detector == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid detector id - {detectorId}'})
         
@@ -724,7 +728,7 @@ def updateAlert(request):
         
     if request.method == 'GET':
         alertId = request.GET.get("id")
-        curAlert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
+        curAlert = (ModelAlert.objects.filter(id=alertId, deleted=0) or [None])[0]
         if curAlert == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid alert id - {alertId}'})
         
@@ -748,7 +752,7 @@ def deleteAlert(request):
         
     if request.method == 'GET':
         alertId = request.GET.get('id')
-        curAlert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
+        curAlert = (ModelAlert.objects.filter(id=alertId, deleted=0) or [None])[0]
         if curAlert == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid alert id - {alertId}'})
 
@@ -765,11 +769,11 @@ def loadAlertsByDetector(request):
         
     if request.method == 'GET':
         detectorId = request.GET.get('detectorId')
-        detector = (ModelDetector.objects.filter(id=detectorId) or [None])[0]
+        detector = (ModelDetector.objects.filter(id=detectorId, deleted=0) or [None])[0]
         if detector == None:
             return JsonResponse({'status': 'error', 'error': 'Invalid detector id - {detectorId}'})
 
-        alerts = ModelAlert.objects.filter(detector=detector)
+        alerts = ModelAlert.objects.filter(detector=detector, deleted=0)
         json = django.core.serializers.serialize('json', alerts)
         return JsonResponse({'status': 'success', 'data' : json})
     return JsonResponse({'status': 'error', 'data': ''} )
@@ -783,7 +787,7 @@ def setAlertStatus(request):
     if request.method == 'GET':
         alertId = request.GET.get("id")
         status = request.GET.get("status")
-        curAlert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
+        curAlert = (ModelAlert.objects.filter(id=alertId, deleted=0) or [None])[0]
         if curAlert == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid alert id - {alertId}'})
         
@@ -804,7 +808,7 @@ def loadAlertHistoryByDetector(request):
     if request.method == 'GET':
 
         alertId = request.GET.get('alertId')
-        alert = (ModelAlert.objects.filter(id=alertId) or [None])[0]
+        alert = (ModelAlert.objects.filter(id=alertId, deleted=0) or [None])[0]
         if alert == None:
             return JsonResponse({'status': 'error', 'error': f'Invalid alert id - {alertId}'})
         
@@ -812,10 +816,10 @@ def loadAlertHistoryByDetector(request):
         endAt = request.GET.get('endAt')  
         
         history = []
-        if startAt != None and endAt != None : history = ModelAlertHistory.objects.filter(alert=alert, startAt__gte=startAt, endAt__lte=endAt )
-        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(alert=alert, startAt__gte=startAt )
-        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(alert=alert, endAt__lte=endAt )
-        else: history = ModelAlertHistory.objects.filter(alert=alert)
+        if startAt != None and endAt != None : history = ModelAlertHistory.objects.filter(alert=alert, startAt__gte=startAt, endAt__lte=endAt ).order_by("-alertAt")
+        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(alert=alert, startAt__gte=startAt ).order_by("-alertAt")
+        elif startAt != None and endAt == None : history = ModelAlertHistory.objects.filter(alert=alert, endAt__lte=endAt ).order_by("-alertAt")
+        else: history = ModelAlertHistory.objects.filter(alert=alert).order_by("-alertAt")
 
         json = django.core.serializers.serialize('json', history)
         return JsonResponse({'status': 'success', 'data' : json})

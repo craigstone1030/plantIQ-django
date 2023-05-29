@@ -35,14 +35,21 @@ class ModelDatasource(models.Model):
     org = models.CharField(max_length=250)
     bucket = models.CharField(max_length=250)
     user = models.ForeignKey(ModelUser, default=-1, on_delete=models.CASCADE)
+    lastUpdate = models.CharField(default='None', max_length=250)
+    deleted = models.IntegerField(default=0)       
 
     class Meta:
         db_table = "tbl_datasource"
 
+
     def getMyDatasourceIdList(userId):
-        modelDSList = ModelDatasource.objects.filter(user_id=userId)
+        modelDSList = ModelDatasource.objects.filter(user_id=userId, deleted=0)
         result = [ds.id for ds in modelDSList]
         return result
+    
+    def delete(self):
+        self.deleted = 1
+        self.save()
 
 class ModelProcess(models.Model):
     name = models.CharField(max_length=250)
@@ -50,7 +57,10 @@ class ModelProcess(models.Model):
     datasource = models.ForeignKey(ModelDatasource, default=-1, on_delete=models.CASCADE)
     metricList = models.TextField(default='') # must string array, then each items are holded by " not '
     status = models.IntegerField(default=1)
-# 
+    deleted = models.IntegerField(default=0)
+
+    
+
     def setMetricNames(self, jsonMetricNames):
         self.metricList = jsonMetricNames
 
@@ -58,7 +68,7 @@ class ModelProcess(models.Model):
         return json.loads(self.metricList)
     
     def getProcessListByUserId(userId):
-        allProcess = ModelProcess.objects.all()
+        allProcess = ModelProcess.objects.filter(deleted=0)
         filterProcess = []
 
         for process in allProcess:
@@ -68,8 +78,12 @@ class ModelProcess(models.Model):
         return filterProcess
     
     def getDatasource(self):
-        datasource = (ModelDatasource.objects.filter(id=self.datasource_id) or [None])[0]
-        return datasource    
+        datasource = (ModelDatasource.objects.filter(id=self.datasource_id, deleted=0) or [None])[0]
+        return datasource
+
+    def delete(self):
+        self.deleted = 1
+        self.save()
 
 
     class Meta:
@@ -85,6 +99,9 @@ class ModelDetector(models.Model):
     status = models.IntegerField(default=1)
     maxAnomaly = models.FloatField(default=0)
     lastScore = models.FloatField(default=0)
+    deleted = models.IntegerField(default=0)
+
+    
 
     def is_valid_uuid(self, value):
         try:
@@ -100,7 +117,7 @@ class ModelDetector(models.Model):
         return json.loads(self.metricList)
     
     def getProcess(self):
-        process = (ModelProcess.objects.filter(id=self.process_id) or [None])[0]
+        process = (ModelProcess.objects.filter(id=self.process_id, deleted=0) or [None])[0]
         return process
     
     def getDatasource(self):
@@ -108,11 +125,11 @@ class ModelDetector(models.Model):
         if process == None:
             return None
 
-        datasource = (ModelDatasource.objects.filter(id=process.datasource_id) or [None])[0]
+        datasource = (ModelDatasource.objects.filter(id=process.datasource_id, deleted=0) or [None])[0]
         return datasource
     
     def getDetectorListByUserId(userId):
-        allDetector = ModelDetector.objects.all()
+        allDetector = ModelDetector.objects.filter(deleted=0)
         filterProcesses = ModelProcess.getProcessListByUserId(userId)
         filterProcessIdList = [ model.id for model in filterProcesses ]
         filterDetector = []
@@ -123,6 +140,10 @@ class ModelDetector(models.Model):
 
         return filterDetector    
     
+    def delete(self):
+        self.deleted = 1
+        self.save()
+
     class Meta:
         db_table = "tbl_detector"
 
@@ -134,11 +155,18 @@ class ModelAlert(models.Model):
     criticalTreshold = models.FloatField(default=None)
     duration = models.IntegerField(default=0) # mseconds
     status = models.IntegerField(default=1)
+    deleted = models.IntegerField(default=0)
+
+    
 
     def getDetector(self):
-        detector = (ModelDetector.objects.filter(id=self.detector_id) or [None])[0]
+        detector = (ModelDetector.objects.filter(id=self.detector_id, deleted=0) or [None])[0]
         return detector
     
+    def delete(self):
+        self.deleted = 1
+        self.save()
+
     class Meta:
         db_table = "tbl_alert"
 

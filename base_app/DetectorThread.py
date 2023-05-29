@@ -37,7 +37,7 @@ class DetectorThread(threading.Thread):
             call_count = call_count + 1
             print(f"Running Detect thread({self.detectorId}), {call_count}")
 
-            detector = (ModelDetector.objects.filter(pk=self.detectorId) or [None])[0]
+            detector = (ModelDetector.objects.filter(pk=self.detectorId, deleted=0) or [None])[0]
             if detector == None:
                 print(f"Detect thread({self.detectorId} was ignored by none detector infomation)")
                 continue
@@ -120,7 +120,7 @@ class DetectorThread(threading.Thread):
     def detectAnomaly(self, detector, detectResult): 
         alertHistorys = []
 
-        alerts = ModelAlert.objects.filter(detector=detector)
+        alerts = ModelAlert.objects.filter(detector=detector, deleted=0)
         
         for alert in alerts:
             # Immedietly Detection

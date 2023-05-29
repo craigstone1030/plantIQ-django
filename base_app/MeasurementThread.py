@@ -38,7 +38,7 @@ class MeasurementThread(threading.Thread):
             call_count = call_count + 1
             if self.log == True : print(f"Running metric thread({self.datasourceId}), {call_count}")
 
-            datasource = (ModelDatasource.objects.filter(pk=self.datasourceId) or [None])[0]
+            datasource = (ModelDatasource.objects.filter(pk=self.datasourceId, deleted=0) or [None])[0]
             if datasource == None:
                 if self.log == True : print(f"metric thread({self.datasourceId} was ignored by none datasource infomation)")
                 continue
@@ -62,12 +62,16 @@ class MeasurementThread(threading.Thread):
 
                 if ret == True and datetime.strptime(curLastUpdate, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp() > datetime.strptime(lastUpdate, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp():
                     if self.log == True : print(f"Metrics updated! {datasource.pk}-{metricName} {lastUpdate} ~ {curLastUpdate}")
+                    
+                    datasource.lastUpdate = curLastUpdate
+                    datasource.save()
+
                     boradcast(json.dumps({
                         "type": SC_METRIC_UPDATED,
                         "datasourceId": self.datasourceId,
                         "metric": metricName,
                         "startAt": lastUpdate,
-                        "stopAt": curLastUpdate}))              
+                        "stopAt": curLastUpdate}))             
 
             influxHandle.close(); del influxHandle
 
