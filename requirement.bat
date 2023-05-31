@@ -2,7 +2,13 @@ pip install django
 pip install django-cors-headers
 pip install influxdb
 pip install influxdb-client
-pip install scedule
 pip install websockets
 pip install PyJWT
 pip install python-jose[rsa]
+pip install numpy
+pip install pandas
+pip install seaborn
+pip install scikit-learn
+pip install rrcf
+pip install apscheduler
+pip install simple-websocket-server
