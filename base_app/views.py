@@ -266,7 +266,7 @@ def loadMonitorsByProcess(request):
             totalAlerts = None; actualScore = None; lastUpdatedAt = None
 
             maxAnomaly = getMaxAnomaly(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt)
-            actualScore = getLastValue(influxHandle, datasource.bucket, detector.exportCode, startAt, stopAt)
+            actualScore = getLastValue(influxHandle, datasource.bucket, detector.exportCode, None, None)
 
             if startAt != None and stopAt != None : histories = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt, alertAt__lte=stopAt )
             elif startAt != None and stopAt == None : histories = ModelAlertHistory.objects.filter(detector=detector, alertAt__gte=startAt )

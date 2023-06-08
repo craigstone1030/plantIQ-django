@@ -313,6 +313,7 @@ def getMaxAnomaly(influxClient, bucket, measurement, startAt, stopAt):
     result = query_api.query(org=settings.INFLUX_ORG, query=query)
     if len(result) > 0: maxValue = result[0].records[0].values['_value']
     else: maxValue = 0
+    
 
     return maxValue
 
@@ -329,7 +330,7 @@ def getLastValue(influxClient, bucket, measurement, startAt, stopAt):
     else:
         query += f'from(bucket: "{bucket}") |> range(start: {startAt}, stop:{stopAt})'
     query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
-    query += f' |> sort(columns: ["_time"], desc: false)'
+    query += f' |> sort(columns: ["_time"], desc: true)'
     query += f' |> first(column: "_value")'
 
     result = query_api.query(org=settings.INFLUX_ORG, query=query)
