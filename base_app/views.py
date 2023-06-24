@@ -123,15 +123,15 @@ def createDatasource(request):
         return JsonResponse({'status': 'error', 'data': 'Can not access this url'})
         
     if request.method == 'GET':
-        userId = modelUser.pk
-        user = (ModelUser.objects.filter(id=userId, deleted=0) or [None])[0]
-        if user == None:
-            return JsonResponse({'status': 'error', 'error': f'Invalid user id - {userId}'})
+        # userId = modelUser.pk
+        # user = (ModelUser.objects.filter(id=userId, deleted=0) or [None])[0]
+        # if user == None:
+        #     return JsonResponse({'status': 'error', 'error': f'Invalid user id - {userId}'})
         
         newDS = ModelDatasource( name=request.GET.get('name'), description=request.GET.get('description'),
                                 url=request.GET.get('url'), token=request.GET.get('token'),
                                 org=request.GET.get('org'), bucket=request.GET.get('bucket'),
-                                user=user )
+                                user=modelUser )
         newDS.save()
 
         json = django.core.serializers.serialize('json',[newDS])

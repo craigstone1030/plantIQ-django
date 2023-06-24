@@ -112,11 +112,8 @@ def getDetectorRecords(influxClient, bucket, detectorName, startAt, stopAt):
         datas = [ ]
         for table in result:
             for row in table.records:
-
                 rfc3339_string = row.values["_time"].strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-                datas.append( [ row.values["_field"], rfc3339_string, row.values["_value"] ] )
-
-                
+                datas.append( [ row.values["_field"], rfc3339_string, row.values["_value"] ] )               
                 
 
         return 'success', datas
@@ -166,22 +163,25 @@ def detectMetrics(influxClient, bucket, measurementList, startAt, stopAt):
     if stopAt == None:
         stopAt = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
+    adjustedStartAt = startAt
+    adjustedStartAt = datetime.fromtimestamp(datetime.strptime(startAt, '%Y-%m-%dT%H:%M:%S.%fZ').timestamp() - settings.UPDATE_INTERVAL * 1000).strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
     data = {}; i = 0
     for measurement in measurementList:
         query = ''
         if startAt == None and stopAt == None:
             query += f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z)'
         elif stopAt == None:
-            query += f'from(bucket: "{bucket}") |> range(start: {startAt})'
+            query += f'from(bucket: "{bucket}") |> range(start: {adjustedStartAt})'
         elif startAt == None:
             query += f'from(bucket: "{bucket}") |> range(start: 1970-12-31T00:00:00.000Z, stop:{stopAt})'
         else:
-            query += f'from(bucket: "{bucket}") |> range(start: {startAt}, stop:{stopAt})'
+            query += f'from(bucket: "{bucket}") |> range(start: {adjustedStartAt}, stop:{stopAt})'
 
         query += f' |> filter(fn: (r) => r._measurement == "{measurement}")'
         query += f' |> drop(columns:["_start", "_stop", "_measurement", "result", "table"])'
         query += f' |> yield(name: "result") \n'
-        query
+
         data_frame = query_api.query_data_frame(org=settings.INFLUX_ORG, query=query)
         data["time"] = data_frame['_time']
         data[f"value{i}"] = data_frame['_value']
@@ -215,9 +215,12 @@ def detectMetrics(influxClient, bucket, measurementList, startAt, stopAt):
     #     results.append( ["value", detectorFrame['time'][ind], detectorFrame['scores'][ind]] )
 
     # ============== Robust ==============
+    detectorFrame = detectorFrame.fillna(detectorFrame.mean())
+    # detectorFrame.drop('time', axis=1, inplace=True)
+               
     np_data = detectorFrame[variable_columns].to_numpy()
     np_data = np.average(np_data, axis=1, weights=rate_columns)
-
+    
     # Generate data
     try:
         anomaly_results = rrcf_detect(np_data.tolist(), 4)

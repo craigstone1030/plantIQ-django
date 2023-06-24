@@ -36,7 +36,7 @@ class ModelDatasource(models.Model):
     bucket = models.CharField(max_length=250)
     user = models.ForeignKey(ModelUser, default=-1, on_delete=models.CASCADE)
     lastUpdate = models.CharField(default='None', max_length=250)
-    deleted = models.IntegerField(default=0)       
+    deleted = models.IntegerField(default=0)
 
     class Meta:
         db_table = "tbl_datasource"
